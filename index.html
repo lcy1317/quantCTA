@@ -98,6 +98,19 @@
     #hero-probability { font-variant-numeric: tabular-nums; }
     #hero-rationale { flex-basis: 100%; overflow-wrap: anywhere; }
     .section-head { display: flex; align-items: end; justify-content: space-between; gap: 15px; margin-bottom: 15px; }
+    .strategy-deck .section-head { margin-bottom: 12px; }
+    .strategy-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .strategy-option { display: grid; align-content: start; gap: 8px; min-width: 0;
+      padding: 13px 14px; text-align: left; background: #f8faff; border-radius: 13px; }
+    .strategy-option:hover { background: #edf3fd; }
+    .strategy-option[aria-pressed="true"] { border-color: var(--blue); background: #edf4ff;
+      box-shadow: inset 0 0 0 1px var(--blue); }
+    .strategy-option strong { color: var(--text); font-size: clamp(16px, 2vw, 22px);
+      line-height: 1.2; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+    .strategy-option[aria-pressed="true"] strong { color: var(--blue); }
+    .strategy-option small { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
+    .strategy-values { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 10px;
+      font-size: 13px; font-variant-numeric: tabular-nums; }
     .note { font-size: 13px; color: var(--muted); margin-top: 4px; overflow-wrap: anywhere; }
     .alert { margin: 0 0 13px; padding: 9px 12px; color: var(--amber); background: #fff4e2; border: 1px solid #edd2ab; border-radius: 9px; overflow-wrap: anywhere; }
     .metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin: 0 0 18px; }
@@ -212,6 +225,10 @@
       .metric { padding: 10px; }
       .decision-filters { width: 100%; } .decision-filters button { flex: 1 1 auto; }
       .chart.equity canvas { height: 196px; }
+      .strategy-options { grid-template-columns: minmax(0, 1fr); gap: 7px; }
+      .strategy-option { grid-template-columns: minmax(0, 1fr) minmax(0, 1.28fr); align-items: center; gap: 4px 10px; }
+      .strategy-option > small { grid-column: 1 / -1; }
+      .strategy-values { justify-content: flex-end; }
     }
     @media (prefers-reduced-transparency: reduce) { .top { background: #fbfcfd; backdrop-filter: none; } }
     @media (prefers-reduced-motion: reduce) {
@@ -257,6 +274,12 @@
       </div>
     </header>
     <div id="service-alert" class="alert" role="status" hidden></div>
+    <section id="strategy-deck" class="card strategy-deck" aria-labelledby="strategy-title" hidden>
+      <header class="section-head">
+        <div><h2 id="strategy-title">阈值策略</h2><p id="strategy-note" class="note">每套独立记账 · 同步采样</p></div>
+      </header>
+      <div id="strategy-options" class="strategy-options" role="group" aria-label="切换要查看的模拟策略"></div>
+    </section>
     <section id="decisions" class="card reveal-on-scroll" aria-labelledby="decisions-title">
       <header class="section-head">
         <div><h2 id="decisions-title">模拟决策记录</h2><p id="decision-note" class="note">每轮展示信号、仓位变化和执行原因 · 北京时间</p></div>
@@ -290,7 +313,7 @@
       </header>
       <dl class="metrics" aria-label="所选币种账户概要">
         <div class="metric"><dt>账户净值</dt><dd id="equity">—</dd><small id="return">累计回报 —</small></div>
-        <div class="metric"><dt>已实现盈亏</dt><dd id="realized">—</dd><small>USDT</small></div>
+        <div class="metric"><dt>已实现盈亏</dt><dd id="realized">—</dd><small id="account-cost">资金费 —</small></div>
         <div class="metric"><dt>未实现盈亏</dt><dd id="unrealized">—</dd><small>USDT</small></div>
         <div class="metric"><dt>平仓胜率</dt><dd id="win-rate">—</dd><small id="closed-count">已平仓 —</small></div>
         <div class="metric"><dt>可用余额</dt><dd id="cash">—</dd><small>USDT</small></div>
@@ -367,9 +390,12 @@
       timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit"
     });
     const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+    const requestedStrategy = new URLSearchParams(location.search).get("strategy");
+    const startingStrategy = ["35-65", "40-60", "45-55"].includes(requestedStrategy) ? requestedStrategy : "35-65";
     const state = {
       latest: null, snapshots: [], snapshot: null, options: null, overview: null,
       history: null, archive: null, archivePin: null, historyKey: null, timeframeSet: false,
+      strategyId: startingStrategy, strategyKey: null, preferredAsset: "",
       audit: {filter: "all", request: null, stack: [], next: null, key: null},
       hero: {request: null, key: null, points: []}
     };
@@ -415,6 +441,7 @@
 
     async function get(path, query, controller) {
       const url = new URL("/api/" + path, window.location.origin);
+      url.searchParams.set("strategy", state.strategyId);
       for (const [key, value] of Object.entries(query)) {
         if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, value);
       }
@@ -500,6 +527,57 @@
       if (className) result.className = className;
       if (value !== undefined) result.textContent = value;
       return result;
+    }
+
+    function renderStrategyPicker(data) {
+      const presets = list(data.strategies);
+      const host = el("strategy-options");
+      el("strategy-deck").hidden = !presets.length;
+      const key = JSON.stringify([presets, data.strategy_summaries, state.strategyId, el("asset").value]);
+      if (state.strategyKey === key) return;
+      const focus = host.contains(document.activeElement) ? document.activeElement.dataset.strategy : null;
+      const asset = el("asset").value;
+      text("strategy-note", (asset ? asset + " · " : "") + "同一信号与报价，每套独立记账");
+      const summaries = new Map(list(data.strategy_summaries).map((row) => [row.id, row]));
+      const cards = presets.map((preset) => {
+        const summary = summaries.get(preset.id);
+        const card = node("button", "strategy-option");
+        card.type = "button";
+        card.dataset.strategy = preset.id;
+        card.setAttribute("aria-pressed", String(preset.id === state.strategyId));
+        const threshold = format(preset.short_at, percent) + " / " + format(preset.long_at, percent);
+        card.setAttribute("aria-label", "切换阈值 " + threshold);
+        const headline = node("strong", "", threshold);
+        const values = node("span", "strategy-values");
+        values.id = "strategy-values-" + preset.id;
+        const performance = node("span", pnlClass(summary?.return_pct), "回报 " + percentagePoints(summary?.return_pct));
+        values.append(performance, node("span", "", "胜率 " + format(summary?.win_rate, percent)));
+        const note = measure(summary?.equity) === null ? "等待首轮采样" :
+          "净值 " + format(summary.equity, money) + " USDT · " + (summary.closed_trades ?? 0) + " 笔平仓";
+        const detail = node("small", "", note + (summary?.started_at ? " · " + formatTime(summary.started_at, axisDate) + " 起" : ""));
+        detail.id = "strategy-detail-" + preset.id;
+        card.setAttribute("aria-describedby", values.id + " " + detail.id);
+        card.append(headline, values, detail);
+        card.addEventListener("click", () => changeStrategy(preset.id));
+        return card;
+      });
+      host.replaceChildren(...cards);
+      if (focus) cards.find((card) => card.dataset.strategy === focus)?.focus({preventScroll: true});
+      state.strategyKey = key;
+    }
+
+    function changeStrategy(id) {
+      if (state.strategyId === id) return;
+      state.strategyId = id;
+      const url = new URL(location.href);
+      if (id === "35-65") url.searchParams.delete("strategy");
+      else url.searchParams.set("strategy", id);
+      history.replaceState(null, "", url);
+      for (const card of el("strategy-options").querySelectorAll("button[data-strategy]")) {
+        card.setAttribute("aria-pressed", String(card.dataset.strategy === id));
+      }
+      text("strategy", "正在读取所选策略");
+      changeAsset();
     }
 
     function renderHeroDecision(row) {
@@ -620,7 +698,8 @@
         ["标记价 / 账户净值", format(row.mark_price) + " / " + format(row.equity, money) + " USDT"],
         ["报价来源", row.contract?.startsWith("MARK:") ?
           row.contract.slice(5) + " · 参考标记价" : (row.contract || "—")],
-        ...(row.skip_reason && row.skip_reason !== row.reason ? [["信号跳过原因", reasonLabel(row.skip_reason)]] : [])
+        ...(row.skip_reason && row.skip_reason !== row.reason ? [["信号跳过原因", reasonLabel(row.skip_reason)]] : []),
+        ...(row.funding_unverified ? [["资金费", "本轮结算查询失败，净收益可能缺少该笔资金费"]] : [])
       ]) {
         const fact = node("div");
         fact.append(node("dt", "", label), node("dd", "", value));
@@ -749,6 +828,8 @@
       }
       text("win-rate", format(account.win_rate, percent));
       text("closed-count", "已平仓 " + format(account.closed_trades) + " 笔");
+      text("account-cost", measure(account.funding) === null ? "资金费 —" :
+        "资金费 " + signed(account.funding) + " · 手续费 " + format(account.fees, money) + " USDT");
       text("cash", format(account.cash, money));
       text("positions-count", format(account.open_positions ?? (waiting ? null : positions.length)));
       table("positions", 6, positions.map((item) => [
@@ -789,8 +870,11 @@
     function renderAssets(assets, selected) {
       const field = el("asset");
       const current = field.value;
+      const priorLabel = field.selectedOptions[0]?.textContent;
       const pairs = assets.map((item) => [String(item.id), item.label || item.title || item.symbol || item.id]);
-      const options = JSON.stringify(pairs);
+      const listed = pairs.length > 0;
+      if (!listed && state.preferredAsset) pairs.push([state.preferredAsset, priorLabel || state.preferredAsset]);
+      const options = JSON.stringify([listed, pairs]);
       if (options !== state.options) {
         const fragment = document.createDocumentFragment();
         for (const [id, label] of pairs) fragment.append(new Option(label, id));
@@ -798,13 +882,14 @@
         field.replaceChildren(fragment);
         state.options = options;
       }
-      const preferred = selected || current;
+      const preferred = selected || state.preferredAsset || current;
       if (pairs.some(([id]) => id === String(preferred))) field.value = preferred;
       else {
         const bitcoin = pairs.find(([id]) => /^BTC(?:USDT)?$/i.test(id));
         field.value = bitcoin ? bitcoin[0] : pairs[0]?.[0] || "";
       }
-      field.disabled = !pairs.length;
+      field.disabled = !listed;
+      if (field.value) state.preferredAsset = field.value;
       text("selected-label", field.value ? field.selectedOptions[0].textContent : "等待币种");
       renderComparison(assets);
     }
@@ -836,6 +921,7 @@
       text("updated", "最近采集 " + formatTime(data.latest_at));
       el("updated").title = "来源时间 " + formatTime(data.source_at);
       renderAssets(list(data.assets), data.selected || data.asset);
+      renderStrategyPicker(data);
       text("hero-asset", el("asset").value ? el("asset").value + " 账户概览" : "账户概览");
       text("hero-updated", formatTime(data.latest_at, roundClock));
       if (data.latest_at) el("hero-updated").dateTime = new Date(data.latest_at * 1000).toISOString();
@@ -1180,6 +1266,7 @@
     }
 
     function changeAsset() {
+      if (el("asset").value) state.preferredAsset = el("asset").value;
       state.history?.abort();
       state.archive?.abort();
       state.historyKey = null;

@@ -30,6 +30,9 @@ REFERENCE_MARKS = {"TON": "MARK:TONUSDT"}
 TIMEFRAMES = ("5m", "15m", "30m", "1h", "4h", "1d", "1w")
 DEFAULT_RULE = {"enabled": True, "mode": "probability", "period": "5m",
                 "long_at": 0.65, "short_at": 0.35}
+PRIMARY_STRATEGY = "35-65"
+STRATEGIES = {"35-65": (0.35, 0.65), "40-60": (0.40, 0.60), "45-55": (0.45, 0.55)}
+EMPTY_PAYLOAD = (hashlib.sha256(b"{}").hexdigest(), gzip.compress(b"{}", mtime=0))
 LOG = logging.getLogger("quant")
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS rounds(
@@ -306,6 +309,22 @@ def load_config(path):
     }
 
 
+def strategy_db(primary, strategy):
+    if strategy not in STRATEGIES:
+        raise ValueError("Unknown strategy")
+    return primary if strategy == PRIMARY_STRATEGY else primary.with_name(
+        f"{primary.stem}-{strategy}{primary.suffix}"
+    )
+
+
+def strategy_config(config, strategy):
+    short_at, long_at = STRATEGIES[strategy]
+    rule = config["rule"]
+    period = rule["period"] if rule["period"] in TIMEFRAMES else DEFAULT_RULE["period"]
+    return dict(config, rule=dict(rule, mode="probability", period=period,
+                                  short_at=short_at, long_at=long_at))
+
+
 def normalized_probabilities(item):
     result = {}
     for period, value in item.get("probabilities", {}).items():
@@ -401,26 +420,29 @@ def decision_details(conn, bucket, plans, states):
         yield asset, bucket, outcome, json.dumps(details, ensure_ascii=False, separators=(",", ":"))
 
 
-def confirmed_funding(conn, assets, now, enabled, proxy=None):
-    if not enabled:
-        return {}, []
+def funding_candidates(conn, now):
     positions = conn.execute("""
-        SELECT p.symbol AS asset, p.opened_at, p.marked_at, MAX(f.time) AS settled
-        FROM paper_positions p LEFT JOIN paper_funding f ON p.symbol=f.symbol GROUP BY p.symbol
+        SELECT p.symbol AS asset,a.symbol,p.opened_at,MAX(f.time) AS settled
+        FROM paper_positions p JOIN assets a ON p.symbol=a.id
+        LEFT JOIN paper_funding f ON p.symbol=f.symbol GROUP BY p.symbol
     """).fetchall()
     pending = {}
     for position in positions:
-        asset = position["asset"]
-        symbol = assets.get(asset)
+        symbol = position["symbol"]
         start = max(position["settled"] or 0, position["opened_at"])
-        if symbol and not symbol.startswith("MARK:") and start // 3600 < now // 3600 and (
-                now % 3600 < 900 or position["marked_at"] // 3600 < now // 3600):
-            pending[asset] = (symbol, start)
-    if not pending:
+        # Keep retrying while the position is open, including outside the first
+        # fifteen minutes of an hour when a settlement endpoint was unavailable.
+        if symbol and not symbol.startswith("MARK:") and start // 3600 < now // 3600:
+            pending[position["asset"]] = (symbol, start)
+    return pending
+
+
+def confirmed_funding(candidates, now, proxy=None):
+    if not candidates:
         return {}, []
 
-    # Fetch the settlement window once for all open positions.
-    start = min(value[1] for value in pending.values()) * 1000 + 1
+    # Fetch the settlement window once for all open positions across strategies.
+    start = min(timestamp for _, timestamp in candidates) * 1000 + 1
     end = now * 1000
     settlements = []
     try:
@@ -437,27 +459,27 @@ def confirmed_funding(conn, assets, now, enabled, proxy=None):
             start = newest
         else:
             return {}, ["Binance funding: settlement window too large"]
-    except (OSError, ValueError, KeyError) as exc:
+        by_symbol = {}
+        for row in settlements:
+            if row.get("markPrice"):
+                by_symbol.setdefault(row["symbol"], []).append({
+                    "time": row["fundingTime"] // 1000, "rate": row["fundingRate"],
+                    "mark_price": row["markPrice"],
+                })
+    except (OSError, ValueError, KeyError, TypeError) as exc:
         return {}, [f"Binance funding: {exc}"]
-    by_symbol = {}
-    for row in settlements:
-        if row.get("markPrice"):
-            by_symbol.setdefault(row["symbol"], []).append({
-                "time": row["fundingTime"] // 1000, "rate": row["fundingRate"],
-                "mark_price": row["markPrice"],
-            })
-    return {asset: by_symbol.get(value[0], []) for asset, value in pending.items()}, []
+    return by_symbol, []
 
 
-def store_round(db, bucket, source, market, errors, config):
-    now = int(time.time())
+def store_round(db, bucket, source, market, errors, config, *, now=None, funding_result=None, archive=True):
+    now = int(time.time()) if now is None else now
     mapping = contracts(market)
     allowed = set(mapping.values())
     items = {item["id"]: item for item in source["assets"]}
     rule = config["rule"]
     with closing(open_db(db)) as conn:
         if conn.execute("SELECT 1 FROM rounds WHERE bucket=?", (bucket,)).fetchone():
-            return
+            return False
         assets = {row["id"]: row["symbol"] for row in conn.execute("SELECT id,symbol FROM assets")}
         open_assets = {row[0] for row in conn.execute("SELECT symbol FROM paper_positions")}
         for asset, item in items.items():
@@ -476,8 +498,12 @@ def store_round(db, bucket, source, market, errors, config):
             else:
                 assets.setdefault(asset, None)
         quotes = quote_snapshot(market, {symbol for symbol in assets.values() if symbol}, now)
-        funding, funding_errors = confirmed_funding(
-            conn, assets, now, config["funding"], config["market_proxy"])
+        if funding_result is None:
+            candidates = funding_candidates(conn, now) if config["funding"] else {}
+            settled, funding_errors = confirmed_funding(tuple(candidates.values()), now, config["market_proxy"])
+        else:
+            candidates, settled, funding_errors = funding_result
+        funding = {asset: settled.get(symbol, []) for asset, (symbol, _) in candidates.items()}
         errors = list(source["errors"]) + errors + funding_errors
         previous_total = conn.execute(
             "SELECT expected FROM rounds WHERE expected>0 ORDER BY bucket DESC LIMIT 1"
@@ -496,7 +522,9 @@ def store_round(db, bucket, source, market, errors, config):
                                  (bucket, now, expected, len(items),
                                   json.dumps(errors, ensure_ascii=False), len(quotes)))
             if not write.rowcount:
-                return
+                return False
+            if not archive:
+                conn.execute("INSERT OR IGNORE INTO payloads VALUES(?,?)", EMPTY_PAYLOAD)
             for asset, item in items.items():
                 conn.execute(
                     "INSERT INTO assets VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET "
@@ -504,11 +532,13 @@ def store_round(db, bucket, source, market, errors, config):
                     (asset, item["label"], item["base"], assets[asset]),
                 )
                 probabilities = normalized_probabilities(item)
-                raw = json.dumps(item["data"], sort_keys=True, ensure_ascii=False,
-                                 separators=(",", ":"), allow_nan=False).encode("utf-8")
-                digest = hashlib.sha256(raw).hexdigest()
-                conn.execute("INSERT OR IGNORE INTO payloads VALUES(?,?)",
-                             (digest, gzip.compress(raw, compresslevel=3, mtime=0)))
+                digest = EMPTY_PAYLOAD[0]
+                if archive:
+                    raw = json.dumps(item["data"], sort_keys=True, ensure_ascii=False,
+                                     separators=(",", ":"), allow_nan=False).encode("utf-8")
+                    digest = hashlib.sha256(raw).hexdigest()
+                    conn.execute("INSERT OR IGNORE INTO payloads VALUES(?,?)",
+                                 (digest, gzip.compress(raw, compresslevel=3, mtime=0)))
                 observed_at, source_at = item.get("observed_at") or now, item.get("source_at")
                 conn.execute("INSERT INTO snapshots VALUES(?,?,?,?,?,?)",
                              (asset, bucket, observed_at, source_at,
@@ -518,6 +548,8 @@ def store_round(db, bucket, source, market, errors, config):
             for asset, symbol in assets.items():
                 quote = quotes.get(symbol)
                 plan, use_book = decision_plan(observations.get(asset), audit_rule, symbol, quote, bucket, now)
+                if funding_errors and asset in candidates:
+                    plan["funding_unverified"] = True
                 plans[asset] = plan
                 if plan["skip_reason"] is None:
                     targets[asset] = plan["target_side"]
@@ -532,8 +564,9 @@ def store_round(db, bucket, source, market, errors, config):
                            symbols=assets, funding=funding, observed_at=now, outcomes=states):
                 conn.executemany("INSERT INTO paper_decisions VALUES(?,?,?,?)",
                                  decision_details(conn, bucket, plans, states))
-    LOG.info("Archived %s/%s assets, %s Binance quotes, %s notices",
-             len(items), expected, len(quotes), len(errors))
+    LOG.info("Archived %s/%s assets, %s Binance quotes, %s notices [%s]",
+             len(items), expected, len(quotes), len(errors), db.stem)
+    return True
 
 
 def collect(db, config_path, bucket, read_source=capture):
@@ -546,7 +579,21 @@ def collect(db, config_path, bucket, read_source=capture):
     except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
         source = {"assets": [], "errors": [f"CTA: {exc}"], "expected": 0}
     market, errors = market_snapshot(config["market_proxy"])
-    store_round(db, bucket, source, market, errors, config)
+    now = int(time.time())
+    pending = {}
+    for strategy in STRATEGIES:
+        with closing(open_db(strategy_db(db, strategy))) as conn:
+            pending[strategy] = funding_candidates(conn, now) if config["funding"] else {}
+    candidates = tuple(candidate for pool in pending.values() for candidate in pool.values())
+    settled, funding_errors = confirmed_funding(candidates, now, config["market_proxy"])
+    for strategy in STRATEGIES:
+        primary = strategy == PRIMARY_STRATEGY
+        candidates = pending[strategy]
+        stored = store_round(strategy_db(db, strategy), bucket, source, market, errors,
+                             strategy_config(config, strategy), now=now, archive=primary,
+                             funding_result=(candidates, settled, funding_errors if candidates else []))
+        if primary and not stored:
+            return
 
 
 def schedule(db, config_path, stopping):
@@ -573,8 +620,10 @@ def get_asset(conn, asset):
 
 
 def account(conn, asset, initial):
-    data = conn.execute("SELECT * FROM paper_equity WHERE symbol=? ORDER BY bucket DESC LIMIT 1",
-                        (asset,)).fetchone()
+    data = conn.execute("""
+        SELECT e.*, (SELECT MIN(bucket) FROM paper_equity WHERE symbol=e.symbol) AS started_at
+        FROM paper_equity e WHERE e.symbol=? ORDER BY e.bucket DESC LIMIT 1
+    """, (asset,)).fetchone()
     closed = conn.execute("SELECT COUNT(*), AVG(net_pnl>0) FROM paper_trades "
                           "WHERE symbol=? AND net_pnl IS NOT NULL", (asset,)).fetchone()
     equity = data["equity"] if data else initial
@@ -584,11 +633,43 @@ def account(conn, asset, initial):
             "unrealized": data["unrealized_pnl"] if data else 0,
             "open_positions": data["positions"] if data else 0,
             "fees": data["fees"] if data else 0, "funding": data["funding_pnl"] if data else 0,
+            "started_at": data["started_at"] if data else None,
             "stale_positions": data["stale_positions"] if data else 0,
             "closed_trades": closed[0], "win_rate": closed[1]}
 
 
-def overview(conn, requested, config):
+def strategy_summaries(db, strategy, asset, current, initial):
+    summaries = []
+    for preset in STRATEGIES:
+        if preset == strategy:
+            summary = current
+        else:
+            with closing(open_db(strategy_db(db, preset))) as conn:
+                summary = conn.execute("""
+                    WITH selected AS (
+                        SELECT COALESCE(?, (SELECT id FROM assets ORDER BY base<>'BTC',id LIMIT 1)) AS id
+                    )
+                    SELECT (SELECT equity FROM paper_equity WHERE symbol=selected.id ORDER BY bucket DESC LIMIT 1)
+                               AS equity,
+                           (SELECT MIN(bucket) FROM paper_equity WHERE symbol=selected.id) AS started_at,
+                           (SELECT COUNT(*) FROM paper_trades WHERE symbol=selected.id AND net_pnl IS NOT NULL)
+                               AS closed_trades,
+                           (SELECT AVG(net_pnl>0) FROM paper_trades WHERE symbol=selected.id AND net_pnl IS NOT NULL)
+                               AS win_rate
+                    FROM selected
+                """, (asset,)).fetchone()
+        active = summary["started_at"] is not None
+        equity = summary["equity"] if active else None
+        summaries.append({
+            "id": preset, "equity": equity, "started_at": summary["started_at"],
+            "return_pct": 100 * (equity / initial - 1) if active else None,
+            "closed_trades": summary["closed_trades"] if active else None,
+            "win_rate": summary["win_rate"] if active else None,
+        })
+    return summaries
+
+
+def overview(conn, requested, config, strategy=PRIMARY_STRATEGY):
     selected = get_asset(conn, requested)
     asset = selected["id"] if selected else None
     rule = config["rule"]
@@ -642,8 +723,11 @@ def overview(conn, requested, config):
                               (asset,))]
     return {"assets": assets, "selected": asset, "latest_at": now["observed_at"] if now else None,
             "source_at": source["source_at"] if source else None, "health": health,
+            "strategy_id": strategy, "strategies": [{"id": preset, "short_at": short_at, "long_at": long_at}
+                        for preset, (short_at, long_at) in STRATEGIES.items()],
             "strategy": {"description": description, "balance": initial, "leverage": 10,
-                         "enabled": bool(rule.get("enabled")), "period": rule.get("period", "5m")},
+                         "enabled": bool(rule.get("enabled")), "period": rule.get("period", "5m"),
+                         "short_at": rule.get("short_at"), "long_at": rule.get("long_at")},
             "account": account(conn, asset, initial), "positions": positions, "trades": trades}
 
 
@@ -792,9 +876,16 @@ def serve(db, config_path, addr, port):
                 if url.path == "/":
                     self.reply(200, (ROOT / "index.html").read_bytes(), "text/html; charset=utf-8")
                     return
-                with closing(open_db(db)) as conn:
+                strategy = values.get("strategy", [PRIMARY_STRATEGY])[0]
+                selected_db = strategy_db(db, strategy)
+                with closing(open_db(db if url.path == "/api/snapshot" else selected_db)) as conn:
                     if url.path in ("/api/overview", "/healthz"):
-                        result = overview(conn, asset, load_config(config_path))
+                        config = strategy_config(load_config(config_path), strategy)
+                        result = overview(conn, asset, config, strategy)
+                        if url.path == "/api/overview":
+                            result["strategy_summaries"] = strategy_summaries(
+                                db, strategy, result["selected"] or asset, result["account"],
+                                config["settings"].initial_equity)
                         self.json(200, result["health"] if url.path == "/healthz" else result)
                     elif url.path == "/api/history":
                         hours = int(values.get("hours", ["24"])[0])
@@ -873,7 +964,8 @@ def main():
     if args.check:
         return check(config)
     db = args.data_dir / "quant.sqlite3"
-    initialize(db)
+    for strategy in STRATEGIES:
+        initialize(strategy_db(db, strategy))
     if args.once:
         collect(db, config_path, int(time.time()) // PERIOD * PERIOD)
     else:

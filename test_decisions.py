@@ -1,8 +1,10 @@
 """Check that audited decisions follow actual fills and preserve legacy history."""
 
 from contextlib import closing
+import json
 from pathlib import Path
 import sqlite3
+from subprocess import CompletedProcess
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
@@ -87,7 +89,70 @@ def check_decisions(directory):
             assert not conn.execute(f"SELECT 1 FROM {table} WHERE bucket=?", (base + 9 * app.PERIOD,)).fetchone()
 
 
+def check_strategies(directory):
+    db = directory / "quant.sqlite3"
+    config = directory / "config.json"
+    config.write_text('{"rule":{"short_at":0.2,"long_at":0.8}}', encoding="utf-8")
+    base = 1795622400
+    due = base + 3600
+
+    def once(bucket, probability, *, price=100, funding=None):
+        now = bucket + 20
+        source = {"expected": 1, "errors": [], "assets": [{
+            "id": "BTC", "base": "BTC", "label": "BTC", "observed_at": now - 5,
+            "source_at": bucket, "probabilities": {"5m": probability}, "data": {"source": "fixture"},
+        }]}
+        market = {
+            "exchange": {"symbols": [
+                {"symbol": "BTCUSDT", "baseAsset": "BTC", "quoteAsset": "USDT",
+                 "contractType": "PERPETUAL", "status": "TRADING"},
+            ]},
+            "last": [{"symbol": "BTCUSDT", "price": price, "time": now * 1000}],
+        }
+        cmd = ["app.py", "--once", "--data-dir", str(directory)]
+        with (
+            patch("sys.argv", cmd),
+            patch("app.time.time", return_value=now),
+            patch("app.subprocess.run", return_value=CompletedProcess([], 0, json.dumps(source), "")) as capture,
+            patch("app.market_snapshot", return_value=(market, [])) as quotes,
+            patch("app.market_get", return_value=funding, side_effect=funding if isinstance(funding, Exception) else None)
+                as settlements,
+        ):
+            assert app.main() == 0
+        return capture.call_count, quotes.call_count, settlements.call_count
+
+    assert once(base, 0.58) == (1, 1, 0)
+    assert once(base, 0.85) == (0, 0, 0)
+    initial_outcomes = []
+    for strategy in app.STRATEGIES:
+        with closing(app.open_db(app.strategy_db(db, strategy))) as conn:
+            initial_outcomes.append(app.decisions(conn, "BTC")["decisions"][0]["outcome"])
+            assert len(app.history(conn, "BTC", 1, "5m", before=base + 25)["points"]) == 1
+    assert initial_outcomes == ["flat", "flat", "open"]
+    assert once(base + 300, 0.62) == (1, 1, 0)
+    assert once(base + 600, 0.68) == (1, 1, 0)
+    assert once(due + 300, 0.7, funding=OSError("temporary outage")) == (1, 1, 1)
+    event = [{"symbol": "BTCUSDT", "fundingTime": due * 1000, "fundingRate": "0.001", "markPrice": "100"}]
+    assert once(due + 1200, 0.5, price=102, funding=event) == (1, 1, 1)
+    with closing(app.open_db(db)) as primary:
+        assert app.get_snapshot(primary, "BTC", base)["data"] == {"source": "fixture"}
+        summaries = app.strategy_summaries(db, app.PRIMARY_STRATEGY, "BTC", app.account(primary, "BTC", 1000), 1000)
+    assert len(summaries) == 3 and all(row["win_rate"] == 1 and row["closed_trades"] == 1 for row in summaries)
+    for strategy, (short_at, long_at) in app.STRATEGIES.items():
+        with closing(app.open_db(app.strategy_db(db, strategy))) as conn:
+            decisions = app.decisions(conn, "BTC")["decisions"]
+            assert decisions[0]["outcome"] == "close" and decisions[1]["funding_unverified"]
+            assert decisions[0]["rule"]["short_at"] == short_at and decisions[0]["rule"]["long_at"] == long_at
+            assert decisions[0]["trades"][0]["funding_pnl"] < 0
+            assert conn.execute("SELECT COUNT(*) FROM paper_funding").fetchone()[0] == 1
+            if strategy != app.PRIMARY_STRATEGY:
+                assert conn.execute("SELECT COUNT(*) FROM payloads").fetchone()[0] == 1
+
+
 if __name__ == "__main__":
     with TemporaryDirectory(dir=Path(__file__).resolve().parent) as directory:
         check_decisions(Path(directory))
+    with TemporaryDirectory(dir=Path(__file__).resolve().parent) as directory:
+        check_strategies(Path(directory))
     print("Paper decision history, migration, pagination, and atomic rollback passed.")
+    print("Live presets, independent balances, shared market snapshot, and funding retry passed.")
