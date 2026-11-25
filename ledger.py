@@ -85,6 +85,9 @@ def install(connection):
         ON paper_trades(symbol, bucket)
     """)
     connection.execute("""
+        CREATE INDEX IF NOT EXISTS paper_trades_bucket ON paper_trades(bucket)
+    """)
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS paper_equity (
             bucket INTEGER NOT NULL, symbol TEXT NOT NULL,
             equity REAL NOT NULL, cash REAL NOT NULL,

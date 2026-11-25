@@ -8,56 +8,71 @@
   <style>
     :root {
       color-scheme: dark;
-      --bg: #0a1017; --card: #101923; --input: #15212e; --line: #283747;
-      --text: #e9f0f7; --muted: #aab9c9; --green: #5de4bf; --blue: #85bcff;
-      --amber: #ffd28d; --red: #ffa7ad;
+      --bg: #020617; --card: #0e1223; --input: #151d31; --line: #334155;
+      --text: #f8fafc; --muted: #aebbd0; --green: #64e4ba; --blue: #9ec5ff;
+      --amber: #ffd085; --red: #ff9ea9;
+      --mono: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       color: var(--text); background: var(--bg);
-      font: 14px/1.5 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font: 16px/1.55 "Fira Sans", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     }
     * { box-sizing: border-box; }
     body { margin: 0; }
     h1, h2, p, figure { margin: 0; }
-    h1 { font-size: clamp(26px, 4vw, 39px); line-height: 1.2; }
-    h2 { font-size: 17px; }
+    h1 { font-size: clamp(31px, 4.5vw, 56px); line-height: 1.14; font-weight: 720; letter-spacing: -.04em; }
+    h2 { font-size: 19px; }
     button, select, input {
-      min-height: 40px; padding: 6px 10px; font: inherit; color: var(--text);
-      background: var(--input); border: 1px solid var(--line); border-radius: 8px;
+      min-height: 44px; padding: 7px 12px; font: inherit; color: var(--text);
+      background: var(--input); border: 1px solid var(--line); border-radius: 8px; font-size: 14px;
+      transition: background-color 140ms ease, border-color 140ms ease;
     }
     button, select, summary { cursor: pointer; }
     button:hover, select:hover { border-color: var(--muted); }
     :focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
     button:disabled, select:disabled, input:disabled { opacity: .65; cursor: default; }
     [hidden] { display: none !important; }
-    .shell { max-width: 1320px; margin: auto; padding-inline: clamp(14px, 4vw, 48px); }
-    .top { border-bottom: 1px solid var(--line); }
-    .top header { display: flex; align-items: center; justify-content: space-between; min-height: 62px; }
-    .brand { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 700; letter-spacing: .04em; }
-    .brand::before { content: ""; width: 12px; height: 12px; background: var(--green); border-radius: 3px; transform: rotate(45deg); }
-    .controls { display: flex; flex-wrap: wrap; align-items: end; gap: 9px; }
-    .status { padding: 4px 9px; border: 1px solid var(--line); border-radius: 20px; color: var(--muted); white-space: nowrap; margin-block: auto; }
-    .status::before { content: "●"; margin-right: 6px; }
+    .shell { max-width: 1440px; margin: auto; padding-inline: clamp(14px, 4vw, 56px); }
+    .top { background: var(--card); border-bottom: 1px solid var(--line); }
+    .top header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 10px; min-height: 67px; }
+    .brand { display: flex; align-items: center; gap: 10px; font: 700 19px/1.3 var(--mono); letter-spacing: -.055em; }
+    .brand::before { content: ""; width: 23px; height: 23px; border-radius: 6px; background:
+      linear-gradient(90deg, transparent 23%, var(--bg) 23% 34%, transparent 34% 47%, var(--bg) 47% 58%, transparent 58% 71%, var(--bg) 71% 82%, transparent 82%) center / 100% 40% no-repeat, var(--green); }
+    .page-nav, .controls { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+    .page-nav { margin-right: auto; gap: 4px; }
+    .page-nav a { display: grid; place-items: center; min-height: 44px; padding: 0 11px; border-radius: 8px;
+      color: var(--muted); text-decoration: none; font-size: 14px; }
+    .page-nav a:hover { background: var(--input); color: var(--text); }
+    .status { display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 20px;
+      color: var(--muted); white-space: nowrap; margin-block: auto; font-size: 12px; }
+    .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
     .positive, .status[data-kind="good"] { color: var(--green); }
     .negative, .status[data-kind="bad"] { color: var(--red); }
     .status[data-kind="warn"] { color: var(--amber); }
-    main { padding-block: 28px 48px; }
-    .intro, .section-head { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-    .note { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    main { padding-block: 29px 64px; }
+    section[id] { scroll-margin-top: 15px; }
+    .intro, .section-head { display: flex; align-items: end; justify-content: space-between; gap: 15px; margin-bottom: 16px; }
+    .intro { border: 1px solid var(--line); border-radius: 16px; padding: clamp(15px, 3vw, 32px);
+      background: radial-gradient(ellipse at 92% 18%, #1b31527d, transparent 59%), linear-gradient(111deg, var(--card), #111a31);
+    }
+    .intro .note { max-width: 75ch; }
+    .intro .controls { min-width: min(100%, 205px); align-items: normal; flex-direction: column; }
+    .note { font-size: 13px; color: var(--muted); margin-top: 4px; overflow-wrap: anywhere; }
     .alert { margin: 0 0 12px; padding: 9px 12px; color: var(--amber); background: #262119; border: 1px solid #674f2f; border-radius: 8px; overflow-wrap: anywhere; }
-    .metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin: 0 0 14px; }
+    .metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin: 0 0 16px; }
     .metric, .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
     .metric { padding: 13px 15px; }
     .metric dt, .metric small { color: var(--muted); }
     .metric small.positive { color: var(--green); }
     .metric small.negative { color: var(--red); }
-    .metric dd { font-size: clamp(18px, 2.5vw, 27px); font-weight: 650; margin: 4px 0 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-    .metric small { display: block; margin-top: 2px; }
-    .card { padding: 16px; margin-bottom: 14px; }
+    .metric dt, .metric small { font-size: 12px; }
+    .metric dd { font: 650 clamp(17px, 2vw, 26px)/1.45 var(--mono); margin: 4px 0 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .metric small { display: block; margin-top: 2px; overflow-wrap: anywhere; }
+    .card { padding: clamp(12px, 2vw, 22px); margin-bottom: 16px; }
     label { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: 12px; max-width: 100%; }
     label select, label input { max-width: 100%; }
     #asset { min-width: 126px; }
-    .columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
-    figure + figure { border-top: 1px solid var(--line); margin-top: 11px; padding-top: 10px; }
-    figcaption { min-height: 21px; display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); }
+    .columns, .chart-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+    .chart-pair { padding-top: 14px; margin-top: 14px; border-top: 1px solid var(--line); }
+    figcaption { min-height: 21px; display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 13px; }
     .legend::before { content: ""; display: inline-block; vertical-align: 1px; width: 8px; height: 8px; border-radius: 100%; background: var(--legend); margin-right: 6px; }
     .chart { position: relative; }
     .chart canvas { display: block; width: 100%; height: 180px; }
@@ -70,7 +85,7 @@
     th { color: var(--muted); font-weight: 550; position: sticky; top: 0; background: var(--card); }
     tbody tr:last-child td { border-bottom: 0; }
     td.empty { color: var(--muted); white-space: normal; }
-    .asset-link { color: var(--blue); background: transparent; padding: 1px 0; border: 0; border-radius: 2px; min-height: 26px; font-weight: 550; }
+    .asset-link { color: var(--blue); background: transparent; padding: 1px 0; border: 0; border-radius: 2px; font-weight: 550; }
     .asset-link:hover { text-decoration: underline; }
     .payload { max-height: 440px; overflow: auto; color: var(--muted); padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
     .json-children { margin-left: 11px; padding-left: 11px; border-left: 1px solid var(--line); }
@@ -79,53 +94,135 @@
     .json-leaf span + span { color: var(--text); }
     .raw { margin-top: 9px; color: var(--muted); }
     pre { max-height: 440px; overflow: auto; }
+    .decision-filters { display: flex; gap: 8px; flex-wrap: wrap; }
+    .decision-filters button { color: var(--muted); }
+    .decision-filters button[aria-pressed="true"] { color: var(--blue); border-color: var(--blue); background: #1a2c4c; }
+    .decision-labels, .decision-row {
+      display: grid; grid-template-columns: minmax(100px, .75fr) minmax(105px, .8fr) minmax(240px, 2fr)
+        minmax(80px, .6fr) minmax(90px, .65fr) 18px; gap: 12px; align-items: center;
+    }
+    .decision-labels { padding: 7px 12px; color: var(--muted); font-size: 12px; }
+    .decision-list { display: grid; gap: 6px; }
+    .decision { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+    .decision[open] { border-color: var(--blue); }
+    .decision-row { list-style: none; min-height: 61px; padding: 8px 12px; font-size: 14px; }
+    .decision-row::-webkit-details-marker { display: none; }
+    .decision-row:hover { background: var(--input); border-radius: 9px; }
+    .decision-row::after { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted);
+      border-bottom: 2px solid var(--muted); transform: rotate(45deg); justify-self: center; margin-top: -4px; }
+    .decision[open] .decision-row::after { transform: rotate(225deg); margin-top: 4px; }
+    .decision-row time, .data-number { font: 13px/1.45 var(--mono); font-variant-numeric: tabular-nums; }
+    .decision-row time small { color: var(--muted); display: block; font-size: 11px; }
+    .decision-pill { justify-self: start; padding: 4px 8px; border-radius: 6px; background: var(--input);
+      font-size: 13px; font-weight: 650; color: var(--muted); }
+    .decision-pill[data-tone="long"] { color: var(--green); background: #10352f; }
+    .decision-pill[data-tone="short"], .decision-pill[data-tone="liquidate"] { color: var(--red); background: #3d2233; }
+    .decision-pill[data-tone="close"] { color: var(--blue); background: #1b2a48; }
+    .decision-pill[data-tone="skipped"] { color: var(--amber); background: #322918; }
+    .decision-reason { min-width: 0; overflow-wrap: anywhere; }
+    .decision-reason small { display: block; color: var(--muted); }
+    .decision-content { border-top: 1px solid var(--line); padding: 12px; }
+    .decision-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; gap: 10px 14px; }
+    .decision-facts div { background: var(--card); border-radius: 7px; padding: 8px 10px; }
+    .decision-facts dt { color: var(--muted); font-size: 12px; }
+    .decision-facts dd { margin: 2px 0 0; font-size: 14px; overflow-wrap: anywhere; }
+    .decision-fills, .decision-content > button { margin-top: 12px; }
+    .decision-paging { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 8px; }
+    .decision-paging button { margin-left: auto; }
+    .empty-state { padding: 24px 12px; border: 1px dashed var(--line); border-radius: 9px; color: var(--muted); }
     @media (max-width: 960px) { .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-    @media (max-width: 830px) { .columns { grid-template-columns: minmax(0, 1fr); gap: 0; } }
+    @media (max-width: 830px) {
+      .columns, .chart-pair { grid-template-columns: minmax(0, 1fr); }
+      .columns { gap: 0; }
+      .decision-labels, .decision-row { grid-template-columns: 82px 90px minmax(0, 1.3fr) 66px 75px 11px; gap: 9px; }
+    }
+    @media (max-width: 680px) {
+      .top header { flex-wrap: wrap; }
+      .top .controls { order: 1; }
+      .page-nav { order: 2; width: 100%; border-top: 1px solid var(--line); }
+      .decision-labels, .decision-equity { display: none; }
+      .decision-row { grid-template-columns: minmax(64px, .75fr) minmax(70px, 1fr) minmax(54px, .7fr) 12px; gap: 4px 8px; }
+      .decision-probability::before { content: "看多"; display: block; font: 12px/1.4 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; color: var(--muted); }
+      .decision-reason { grid-row: 2; grid-column: 1 / -1; }
+      .decision-row::after { grid-column: 4; grid-row: 1; }
+      .decision-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
     @media (max-width: 560px) {
       .intro, .section-head { flex-direction: column; align-items: start; gap: 8px; }
+      .intro .controls { width: 100%; }
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-      .metric, .card { padding: 11px; }
+      .metric { padding: 11px; }
+      .decision-filters { width: 100%; }
+      .decision-filters button { flex: 1 1 auto; }
       .chart.equity canvas { height: 195px; }
     }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
   </style>
 </head>
 <body>
   <div class="top">
     <header class="shell">
-      <div class="brand">Quant</div>
+      <div class="brand">Quant CTA</div>
+      <nav class="page-nav" aria-label="面板导航">
+        <a href="#decisions">模拟决策</a><a href="#account">账户表现</a><a href="#archive-section">因子回溯</a>
+      </nav>
       <div class="controls"><span id="health" class="status" role="status">连接中</span><button id="refresh" type="button">刷新</button></div>
     </header>
   </div>
   <main class="shell">
     <header class="intro">
-      <div><h1>CTA 因子与模拟盘</h1><p id="strategy" class="note">正在读取模拟盘设置</p></div>
-      <p id="updated" class="note">最近采集 —</p>
+      <div><h1>CTA 模拟盘</h1><p id="strategy" class="note">正在读取模拟盘设置</p></div>
+      <div class="controls">
+        <label>当前币种<select id="asset" disabled><option value="">等待采集</option></select></label>
+        <p id="updated" class="note">最近采集 —</p>
+      </div>
     </header>
     <div id="service-alert" class="alert" role="status" hidden></div>
-    <section class="card" aria-labelledby="account-title">
-      <header class="section-head">
-        <div><h2 id="account-title">币种账户</h2><p id="history-note" class="note">时间按北京时间显示</p></div>
-        <div class="controls">
-          <label>币种<select id="asset" disabled><option value="">等待采集</option></select></label>
-          <label>时间范围<select id="hours"><option value="6">6 小时</option><option value="24" selected>24 小时</option><option value="168">7 天</option><option value="720">30 天</option></select></label>
-          <label>因子周期<select id="timeframe"><option value="5m">5 分钟</option><option value="15m">15 分钟</option><option value="30m">30 分钟</option><option value="1h">1 小时</option><option value="4h">4 小时</option><option value="1d">日线</option><option value="1w">周线</option></select></label>
-          <label>截至时间（北京时间）<input id="before" type="datetime-local"></label>
-          <button id="live" type="button" hidden>回到最新</button>
-        </div>
-      </header>
-      <dl class="metrics">
+    <dl class="metrics" aria-label="所选币种账户概要">
         <div class="metric"><dt>账户净值</dt><dd id="equity">—</dd><small id="return">累计回报 —</small></div>
         <div class="metric"><dt>已实现盈亏</dt><dd id="realized">—</dd><small>USDT</small></div>
         <div class="metric"><dt>未实现盈亏</dt><dd id="unrealized">—</dd><small>USDT</small></div>
         <div class="metric"><dt>平仓胜率</dt><dd id="win-rate">—</dd><small id="closed-count">已平仓 —</small></div>
         <div class="metric"><dt>可用余额</dt><dd id="cash">—</dd><small>USDT</small></div>
         <div class="metric"><dt>当前持仓数</dt><dd id="positions-count">—</dd><small id="selected-label">等待币种</small></div>
-      </dl>
+    </dl>
+    <section id="decisions" class="card" aria-labelledby="decisions-title">
+      <header class="section-head">
+        <div><h2 id="decisions-title">模拟决策记录</h2><p id="decision-note" class="note">每轮展示信号、仓位变化和执行原因 · 北京时间</p></div>
+        <div class="decision-filters" role="group" aria-label="按决策结果筛选">
+          <button type="button" data-filter="all" aria-pressed="true">全部</button>
+          <button type="button" data-filter="trades" aria-pressed="false">有成交</button>
+          <button type="button" data-filter="held" aria-pressed="false">保持仓位</button>
+          <button type="button" data-filter="skipped" aria-pressed="false">未执行</button>
+        </div>
+      </header>
+      <div id="decision-alert" class="alert" role="alert" hidden></div>
+      <div id="decision-labels" class="decision-labels" aria-hidden="true" hidden>
+        <span>采样时间</span><span>结果</span><span>仓位和原因</span><span>看多概率</span><span>净值</span>
+      </div>
+      <div id="decision-list" class="decision-list"><p class="empty-state">正在读取决策</p></div>
+      <div class="decision-paging">
+        <span id="decision-status" class="note" role="status"></span>
+        <button id="newer-decisions" type="button" hidden>较新的决策</button>
+        <button id="more-decisions" type="button" hidden>更早的决策</button>
+      </div>
+    </section>
+    <section id="account" class="card" aria-labelledby="account-title">
+      <header class="section-head">
+        <div><h2 id="account-title">账户表现</h2><p id="history-note" class="note">时间按北京时间显示</p></div>
+        <div class="controls">
+          <label>时间范围<select id="hours"><option value="6">6 小时</option><option value="24" selected>24 小时</option><option value="168">7 天</option><option value="720">30 天</option></select></label>
+          <label>因子周期<select id="timeframe"><option value="5m">5 分钟</option><option value="15m">15 分钟</option><option value="30m">30 分钟</option><option value="1h">1 小时</option><option value="4h">4 小时</option><option value="1d">日线</option><option value="1w">周线</option></select></label>
+          <label>截至时间（北京时间）<input id="before" type="datetime-local"></label>
+          <button id="live" type="button" hidden>回到最新</button>
+        </div>
+      </header>
       <div id="history-alert" class="alert" role="status" hidden></div>
       <figure>
         <figcaption><span class="legend" style="--legend: var(--green)">账户净值（USDT）</span><span id="equity-readout"></span></figcaption>
         <div class="chart equity"><canvas id="equity-chart" aria-label="账户净值曲线" role="img"></canvas><span id="equity-empty" class="chart-empty">等待净值数据</span><span class="chart-tip" hidden></span></div>
       </figure>
+      <div class="chart-pair">
       <figure>
         <figcaption><span class="legend" style="--legend: var(--blue)">币安价格（USDT）</span><span id="price-readout"></span></figcaption>
         <div class="chart"><canvas id="price-chart" aria-label="币安价格曲线" role="img"></canvas><span id="price-empty" class="chart-empty">等待价格数据</span><span class="chart-tip" hidden></span></div>
@@ -134,6 +231,7 @@
         <figcaption><span class="legend" style="--legend: var(--amber)" id="probability-label">看多概率</span><span id="probability-readout"></span></figcaption>
         <div class="chart"><canvas id="probability-chart" aria-label="看多概率曲线" role="img"></canvas><span id="probability-empty" class="chart-empty">等待概率数据</span><span class="chart-tip" hidden></span></div>
       </figure>
+      </div>
     </section>
     <div class="columns">
       <section class="card" aria-labelledby="positions-title">
@@ -155,9 +253,9 @@
         <thead><tr><th scope="col">币种</th><th scope="col">净值（USDT）</th><th scope="col">累计回报</th><th scope="col">平仓胜率</th><th scope="col">已平仓数</th></tr></thead><tbody id="accounts"></tbody>
       </table></div>
     </section>
-    <section class="card" aria-labelledby="archive-title">
+    <section id="archive-section" class="card" aria-labelledby="archive-title">
       <header class="section-head">
-        <div><h2 id="archive-title">因子快照回溯</h2><p id="archive-note" class="note">按上方币种筛选</p></div>
+        <div><h2 id="archive-title" tabindex="-1">因子快照回溯</h2><p id="archive-note" class="note">按上方币种筛选</p></div>
         <div class="controls">
           <label>快照时间<select id="archive-at" disabled><option value="">等待采集</option></select></label>
           <label>字段筛选<input id="factor-search" type="search" placeholder="周期、字段名或值" disabled></label>
@@ -183,9 +281,16 @@
     const axisDate = new Intl.DateTimeFormat("zh-CN", {
       timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23"
     });
+    const roundClock = new Intl.DateTimeFormat("zh-CN", {
+      timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+    });
+    const roundDate = new Intl.DateTimeFormat("zh-CN", {
+      timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit"
+    });
     const state = {
       latest: null, snapshots: [], snapshot: null, options: null, overview: null,
-      history: null, archive: null, historyKey: null, timeframeSet: false
+      history: null, archive: null, archivePin: null, historyKey: null, timeframeSet: false,
+      audit: {filter: "all", request: null, stack: [], next: null, key: null}
     };
 
     function measure(value) {
@@ -284,6 +389,189 @@
       return value === "long" ? "多" : value === "short" ? "空" : "—";
     }
 
+    const reasons = {
+      signal_entry: "信号达到开仓阈值", signal_reverse: "信号反向，先平旧仓",
+      signal_flat: "信号回到中性区间", maintenance_margin: "保证金低于维持要求",
+      bankruptcy_price: "模拟价格触及破产线", hold_signal: "信号与当前持仓同向",
+      flat_signal: "信号中性，继续空仓", insufficient_cash: "可用余额不足",
+      entry_maintenance: "建仓后保证金不足", strategy_disabled: "策略已暂停",
+      missing_snapshot: "本轮没有因子快照", missing_signal: "所用周期没有有效信号",
+      missing_source_time: "原站未提供行情时间", stale_signal: "原站信号已过期",
+      future_signal: "行情时间晚于采样", round_expired: "采集完成时已进入下一轮",
+      missing_contract: "没有可用合约", missing_quote: "没有新鲜的 Binance 报价",
+      quote_before_signal: "报价早于信号，跳过执行", legacy_fill: "升级前成交，保留实际记录"
+    };
+    const positionSide = (value) => value === 1 ? "持多" : value === -1 ? "持空" : value === 0 ? "空仓" : "—";
+    const sideLabel = (value) => value === 1 ? "多" : value === -1 ? "空" : "";
+    const reasonLabel = (value) => Object.hasOwn(reasons, value) ? reasons[value] : (value || "—");
+    const decisionTitle = (row) => ({
+      open: "开" + sideLabel(row.result_side),
+      close: "平" + sideLabel(row.previous_side),
+      reverse: "反手做" + sideLabel(row.result_side),
+      liquidate: "模拟强平", hold: "继续持" + sideLabel(row.result_side),
+      flat: "继续观望", skipped: "未执行"
+    })[row.outcome] || "决策";
+
+    function node(tag, className, value) {
+      const result = document.createElement(tag);
+      if (className) result.className = className;
+      if (value !== undefined) result.textContent = value;
+      return result;
+    }
+
+    function decisionCard(row, expanded) {
+      const card = node("details", "decision");
+      card.dataset.bucket = row.bucket;
+      card.open = expanded;
+      const head = node("summary", "decision-row");
+      const when = node("time", "", formatTime(row.bucket, roundClock));
+      when.dateTime = new Date(row.bucket * 1000).toISOString();
+      when.append(node("small", "", formatTime(row.bucket, roundDate)));
+      const pill = node("span", "decision-pill", decisionTitle(row));
+      pill.dataset.tone = ["open", "reverse", "hold"].includes(row.outcome) ?
+        (row.result_side === 1 ? "long" : "short") : row.outcome;
+      const rationale = node("span", "decision-reason", reasonLabel(row.reason));
+      rationale.append(node("small", "", positionSide(row.previous_side) + " → " + positionSide(row.result_side)));
+      const probability = node("span", "data-number decision-probability", format(row.probability, percent));
+      probability.setAttribute("aria-label", "看多概率 " + probability.textContent);
+      const equity = node("span", "data-number decision-equity", format(row.equity, money));
+      equity.setAttribute("aria-label", "净值 " + equity.textContent + " USDT");
+      head.append(when, pill, rationale, probability, equity);
+      card.append(head);
+
+      const content = node("div", "decision-content");
+      const facts = node("dl", "decision-facts");
+      let rule = "早期记录，未保存阈值";
+      if (row.rule) {
+        rule = row.rule.mode === "direction" ? row.rule.period + " 综合方向" :
+          row.rule.period + " · ≥" + format(row.rule.long_at, percent) + " 做多 · ≤" +
+          format(row.rule.short_at, percent) + " 做空";
+        if (!row.rule.enabled) rule += " · 策略暂停";
+      }
+      for (const [label, value] of [
+        ["使用规则", rule],
+        ["原仓位 → 信号目标 → 执行后", [row.previous_side, row.target_side, row.result_side].map(positionSide).join(" → ")],
+        ["轮次处理时间", formatTime(row.observed_at)],
+        ["信号读取 / 原站 K 线", formatTime(row.signal_at) + " / " + formatTime(row.source_at)],
+        ["报价时间", formatTime(row.quote_at)],
+        ["标记价 / 账户净值", format(row.mark_price) + " / " + format(row.equity, money) + " USDT"],
+        ["报价来源", row.contract?.startsWith("MARK:") ?
+          row.contract.slice(5) + " · 参考标记价" : (row.contract || "—")],
+        ...(row.skip_reason && row.skip_reason !== row.reason ? [["信号跳过原因", reasonLabel(row.skip_reason)]] : [])
+      ]) {
+        const fact = node("div");
+        fact.append(node("dt", "", label), node("dd", "", value));
+        facts.append(fact);
+      }
+      content.append(facts);
+      if (list(row.trades).length) {
+        const fills = node("div", "table-scroll decision-fills");
+        fills.tabIndex = 0;
+        fills.setAttribute("aria-label", "该轮实际模拟成交");
+        const ledger = node("table");
+        const header = ledger.createTHead().insertRow();
+        for (const label of ["动作", "成交价格", "数量", "手续费", "净盈亏", "成交时间"]) {
+          const cell = node("th", "", label);
+          cell.scope = "col";
+          header.append(cell);
+        }
+        const body = ledger.createTBody();
+        for (const fill of row.trades) {
+          const cells = [
+            ({open: "开", close: "平", liquidate: "强平"})[fill.action] + sideLabel(fill.side),
+            format(fill.price), format(fill.quantity), format(fill.fee), signed(fill.net_pnl),
+            formatTime(fill.observed_at)
+          ];
+          const tr = body.insertRow();
+          cells.forEach((value, i) => tr.append(node("td", i === 4 ? pnlClass(fill.net_pnl) : "", value)));
+        }
+        fills.append(ledger);
+        content.append(fills);
+      }
+      if (row.signal_at) {
+        const snapshot = node("button", "", "查看当时因子");
+        snapshot.type = "button";
+        snapshot.addEventListener("click", () => openDecisionSnapshot(row));
+        content.append(snapshot);
+      }
+      card.append(content);
+      return card;
+    }
+
+    function renderDecisions(data, preserve) {
+      const items = list(data.decisions);
+      const host = el("decision-list");
+      const expanded = new Set(preserve ? [...host.querySelectorAll("details[open]")].map((item) => item.dataset.bucket) : []);
+      const focused = document.activeElement;
+      const active = preserve && focused?.closest(".decision");
+      const rows = items.map((row) => decisionCard(row, expanded.has(String(row.bucket))));
+      host.replaceChildren(...(rows.length ? rows : [node("p", "empty-state",
+        data.asset ? "这个筛选下还没有记录。" : "等待首次采集。")]));
+      if (active) {
+        const replacement = rows.find((row) => row.dataset.bucket === active.dataset.bucket);
+        replacement?.querySelector(focused.matches("button") ? "button" : "summary")?.focus({preventScroll: true});
+      }
+      el("decision-labels").hidden = !rows.length;
+      text("decision-note", data.audit_started_at ?
+        "完整决策自 " + formatTime(data.audit_started_at) + " 起 · 更早仅显示有记录的成交" :
+        "每轮展示信号、仓位变化和执行原因 · 北京时间");
+      text("decision-status", rows.length ? "本页 " + rows.length + " 条 · 北京时间" : "");
+    }
+
+    function resetDecisions() {
+      const audit = state.audit;
+      audit.request?.abort();
+      audit.request = null;
+      audit.stack = [];
+      audit.next = null;
+      audit.key = null;
+      alertText("decision-alert", "");
+      renderDecisions({}, false);
+      el("more-decisions").hidden = el("newer-decisions").hidden = true;
+    }
+
+    async function loadDecisions(force = false, page = null) {
+      const audit = state.audit;
+      const asset = el("asset").value;
+      if (!asset) {
+        resetDecisions();
+        return;
+      }
+      if (audit.request && !force) return;
+      const stack = page ?? audit.stack;
+      const before = stack.at(-1);
+      const key = JSON.stringify([asset, audit.filter, before ?? null, before ? null : state.latest]);
+      if (!force && audit.key === key) return;
+      audit.request?.abort();
+      const request = new AbortController();
+      audit.request = request;
+      const paging = [el("newer-decisions"), el("more-decisions")];
+      paging.forEach((button) => { button.disabled = true; });
+      alertText("decision-alert", "");
+      if (!audit.key || page) text("decision-status", "正在读取决策");
+      try {
+        const data = await get("decisions", { asset, before, limit: 12, filter: audit.filter }, request);
+        if (request.signal.aborted) return;
+        renderDecisions(data, !page && Boolean(audit.key));
+        audit.stack = stack;
+        audit.next = data.next_before;
+        audit.key = key;
+        paging[0].hidden = !stack.length;
+        paging[1].hidden = !audit.next;
+        if (page) el("decision-list").querySelector("summary")?.focus();
+      } catch (error) {
+        if (!isSuperseded(request)) {
+          text("decision-status", "");
+          alertText("decision-alert", "读取决策失败 · " + error.message);
+        }
+      } finally {
+        if (audit.request === request) {
+          audit.request = null;
+          paging.forEach((button) => { button.disabled = false; });
+        }
+      }
+    }
+
     function renderAccount(account = {}, positions = [], trades = [], waiting = false) {
       text("equity", format(account.equity, money));
       text("return", "累计回报 " + percentagePoints(account.return_pct));
@@ -304,7 +592,7 @@
       table("trades", 7, [...trades].sort((a, b) => Number(b.at) - Number(a.at)).map((item) => [
         formatTime(item.at), (actions[item.action] || item.action || "") + direction(item.direction),
         format(item.price), format(item.qty), format(item.fee),
-        [signed(item.pnl), pnlClass(item.pnl)], item.reason || "—"
+        [signed(item.pnl), pnlClass(item.pnl)], reasonLabel(item.reason)
       ]), waiting ? "等待账户数据" : "暂无模拟成交");
     }
 
@@ -361,7 +649,7 @@
       else if (["delayed", "stale", "partial", "degraded", "warning"].includes(status)) healthIndicator("warn", "采集延迟或不完整");
       else if (data.latest_at && ["ok", "normal", "healthy", ""].includes(status)) healthIndicator("good", "采集正常");
       else healthIndicator("", "等待采集");
-      const statusParts = [health.message];
+      const statusParts = status === "normal" ? [] : [health.message];
       if (measure(health.count) !== null && measure(health.expected) !== null && Number(health.count) < Number(health.expected)) {
         statusParts.push("本轮覆盖 " + health.count + " / " + health.expected + " 个币种");
       }
@@ -545,13 +833,16 @@
       const field = el("archive-at");
       const old = keepSelection ? field.value : "";
       const fragment = document.createDocumentFragment();
+      const pin = state.archivePin;
+      const external = pin !== null && !state.snapshots.some((snapshot) => Number(snapshot.at) === pin);
       if (state.snapshots.length) {
         fragment.append(new Option("最新 · " + formatTime(state.snapshots[0].at), "latest"));
         for (const snapshot of state.snapshots) fragment.append(new Option(formatTime(snapshot.at), snapshot.at));
-      } else fragment.append(new Option("当前时段没有快照", ""));
+      } else if (!external) fragment.append(new Option("当前时段没有快照", ""));
+      if (external) fragment.append(new Option("决策快照 · " + formatTime(pin), pin));
       field.replaceChildren(fragment);
-      field.disabled = !state.snapshots.length;
-      if (state.snapshots.some((snapshot) => String(snapshot.at) === old)) field.value = old;
+      field.disabled = !state.snapshots.length && !external;
+      if ([...field.options].some((option) => option.value === old)) field.value = old;
     }
 
     function jsonTree(value, query, key = "", depth = 0, ancestorMatch = false) {
@@ -635,6 +926,17 @@
       }
     }
 
+    function openDecisionSnapshot(row) {
+      state.archivePin = Number(row.bucket);
+      snapshotOptions(true);
+      el("archive-at").value = String(row.bucket);
+      el("factor-search").value = "";
+      if (state.snapshot?.at === row.bucket) renderArchive();
+      loadSnapshot();
+      el("archive-title").focus();
+      el("archive-section").scrollIntoView({block: "start"});
+    }
+
     async function loadHistory(force = false) {
       const asset = el("asset").value;
       const hours = el("hours").value;
@@ -682,7 +984,7 @@
         if (request.signal.aborted) return;
         renderOverview(data);
         state.latest = data.latest_at || null;
-        await loadHistory(force);
+        await Promise.all([loadHistory(force), loadDecisions(force)]);
       } catch (error) {
         if (isSuperseded(request)) return;
         healthIndicator("bad", "连接失败");
@@ -701,6 +1003,8 @@
       state.historyKey = null;
       state.snapshots = [];
       state.snapshot = null;
+      state.archivePin = null;
+      resetDecisions();
       for (const chart of charts) chart.update([]);
       snapshotOptions(false);
       renderArchive("正在读取所选币种");
@@ -713,6 +1017,20 @@
     }
 
     el("asset").addEventListener("change", changeAsset);
+    for (const button of document.querySelectorAll(".decision-filters button")) {
+      button.addEventListener("click", () => {
+        if (state.audit.filter === button.dataset.filter) return;
+        state.audit.filter = button.dataset.filter;
+        for (const option of document.querySelectorAll(".decision-filters button"))
+          option.setAttribute("aria-pressed", String(option === button));
+        resetDecisions();
+        loadDecisions();
+      });
+    }
+    el("newer-decisions").addEventListener("click", () => loadDecisions(true, state.audit.stack.slice(0, -1)));
+    el("more-decisions").addEventListener("click", () => {
+      if (state.audit.next) loadDecisions(true, [...state.audit.stack, state.audit.next]);
+    });
     el("hours").addEventListener("change", () => loadHistory());
     el("timeframe").addEventListener("change", () => {
       state.timeframeSet = true;

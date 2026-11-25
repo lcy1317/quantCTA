@@ -70,6 +70,15 @@ CREATE TABLE IF NOT EXISTS quotes(
     observed_at INTEGER NOT NULL,
     PRIMARY KEY(asset,bucket)
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS paper_decisions(
+    asset TEXT NOT NULL REFERENCES assets(id),
+    bucket INTEGER NOT NULL REFERENCES rounds(bucket),
+    outcome TEXT NOT NULL,
+    details TEXT NOT NULL,
+    PRIMARY KEY(asset,bucket)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS paper_decisions_asset_outcome
+ON paper_decisions(asset,outcome,bucket);
 """
 
 
@@ -238,7 +247,7 @@ def quote_snapshot(market, symbols, now):
             price = numeric(mark.get("markPrice"), True)
             if price and abs(now - mark_at) <= 120:
                 quotes[symbol] = {"price": price, "mark_price": price, "bid": None, "ask": None,
-                                  "book_at": 0, "last_at": mark_at}
+                                  "book_at": 0, "last_at": mark_at, "mark_at": mark_at}
             continue
         last = index["last"].get(symbol, {})
         book = index["books"].get(symbol, {})
@@ -257,6 +266,7 @@ def quote_snapshot(market, symbols, now):
             quotes[symbol] = {
                 "price": price, "mark_price": mark_price or price, "bid": bid, "ask": ask,
                 "last_at": last_at if last_price else 0, "book_at": book_at if bid else 0,
+                "mark_at": mark_at if mark_price else 0,
             }
     return quotes
 
@@ -319,6 +329,76 @@ def decide(item, probabilities, rule):
     if probability <= rule["short_at"]:
         return -1
     return 0
+
+
+def decision_plan(observation, rule, contract, quote, bucket, now):
+    target, probability, signal_at, source_at = observation or (None, None, None, None)
+    quote_at = None
+    if quote:
+        quote_at = max(quote["book_at"], quote["last_at"], quote["mark_at"]) or None
+    use_book = False
+    if not rule["enabled"]:
+        skip = "strategy_disabled"
+    elif observation is None:
+        skip = "missing_snapshot"
+    elif target is None:
+        skip = "missing_signal"
+    elif not source_at:
+        skip = "missing_source_time"
+    elif source_at < bucket - PERIOD:
+        skip = "stale_signal"
+    elif source_at > now + 10:
+        skip = "future_signal"
+    elif now >= bucket + PERIOD:
+        skip = "round_expired"
+    elif not contract:
+        skip = "missing_contract"
+    elif not quote:
+        skip = "missing_quote"
+    elif quote["book_at"] >= signal_at:
+        skip, use_book, quote_at = None, True, quote["book_at"]
+    elif quote["last_at"] >= signal_at:
+        skip, quote_at = None, quote["last_at"]
+    else:
+        skip = "quote_before_signal"
+    return {
+        "signal_at": signal_at, "source_at": source_at, "quote_at": quote_at,
+        "probability": probability, "rule": rule, "target_side": target,
+        "contract": contract, "price": quote["price"] if quote else None,
+        "mark_price": quote["mark_price"] if quote else None, "skip_reason": skip,
+    }, use_book
+
+
+def executed_outcome(trades):
+    actions = {trade["action"] for trade in trades}
+    if "liquidate" in actions:
+        return "liquidate"
+    if actions == {"open", "close"}:
+        return "reverse"
+    return trades[0]["action"]
+
+
+def decision_details(conn, bucket, plans, states):
+    fills = {}
+    for trade in conn.execute("""
+        SELECT symbol,action,reason FROM paper_trades WHERE bucket=? ORDER BY id
+    """, (bucket,)):
+        fills.setdefault(trade["symbol"], []).append(trade)
+    for asset, details in plans.items():
+        previous_side, result_side, entry_rejection = states[asset]
+        skip = details["skip_reason"] or entry_rejection
+        trades = fills.get(asset)
+        if trades:
+            outcome, reason = executed_outcome(trades), trades[0]["reason"]
+        elif skip:
+            outcome, reason = "skipped", skip
+        elif result_side:
+            outcome, reason = "hold", "hold_signal"
+        else:
+            outcome, reason = "flat", "flat_signal"
+        details.update(previous_side=previous_side, result_side=result_side,
+                       reason=reason, skip_reason=skip)
+        yield asset, bucket, outcome, json.dumps(details, ensure_ascii=False, separators=(",", ":"))
 
 
 def confirmed_funding(conn, assets, now, enabled, proxy=None):
@@ -403,7 +483,14 @@ def store_round(db, bucket, source, market, errors, config):
             "SELECT expected FROM rounds WHERE expected>0 ORDER BY bucket DESC LIMIT 1"
         ).fetchone()
         expected = source.get("expected") or (previous_total[0] if previous_total else len(items))
-        targets, paper_quotes = {}, {}
+        observations, plans, targets, paper_quotes, states = {}, {}, {}, {}, {}
+        mode = rule["mode"] if rule["mode"] in ("probability", "direction") else None
+        timeframe = rule["period"] if rule["period"] in TIMEFRAMES else None
+        audit_rule = {
+            "enabled": bool(rule["enabled"]), "mode": mode, "period": timeframe,
+            "long_at": numeric(rule["long_at"]) if mode == "probability" else None,
+            "short_at": numeric(rule["short_at"]) if mode == "probability" else None,
+        }
         with conn:
             write = conn.execute("INSERT OR IGNORE INTO rounds VALUES(?,?,?,?,?,?)",
                                  (bucket, now, expected, len(items),
@@ -426,24 +513,25 @@ def store_round(db, bucket, source, market, errors, config):
                 conn.execute("INSERT INTO snapshots VALUES(?,?,?,?,?,?)",
                              (asset, bucket, observed_at, source_at,
                               json.dumps(probabilities), digest))
-                target = decide(item, probabilities, rule)
-                quote = quotes.get(assets[asset])
-                if (target is not None and quote and source_at
-                        and bucket - PERIOD <= source_at <= now + 10 and now < bucket + PERIOD):
-                    if quote["book_at"] >= observed_at:
-                        targets[asset] = target
-                    elif quote["last_at"] >= observed_at:
-                        targets[asset] = target
-                        paper_quotes[asset] = dict(quote, bid=None, ask=None)
+                observations[asset] = (decide(item, probabilities, rule),
+                                       probabilities.get(timeframe), observed_at, source_at)
             for asset, symbol in assets.items():
-                if symbol in quotes:
-                    quote = quotes[symbol]
+                quote = quotes.get(symbol)
+                plan, use_book = decision_plan(observations.get(asset), audit_rule, symbol, quote, bucket, now)
+                plans[asset] = plan
+                if plan["skip_reason"] is None:
+                    targets[asset] = plan["target_side"]
+                    if not use_book:
+                        paper_quotes[asset] = dict(quote, bid=None, ask=None)
+                if quote:
                     conn.execute("INSERT INTO quotes VALUES(?,?,?,?,?,?,?,?)",
                                  (asset, symbol, bucket, quote["price"], quote["mark_price"],
                                   quote["bid"], quote["ask"], now))
                     paper_quotes.setdefault(asset, quote)
-            ledger.step(conn, bucket, targets, paper_quotes, config["settings"],
-                        symbols=assets, funding=funding, observed_at=now)
+            if ledger.step(conn, bucket, targets, paper_quotes, config["settings"],
+                           symbols=assets, funding=funding, observed_at=now, outcomes=states):
+                conn.executemany("INSERT INTO paper_decisions VALUES(?,?,?,?)",
+                                 decision_details(conn, bucket, plans, states))
     LOG.info("Archived %s/%s assets, %s Binance quotes, %s notices",
              len(items), expected, len(quotes), len(errors))
 
@@ -605,6 +693,83 @@ def get_snapshot(conn, requested, at):
             "asset": selected["id"], "data": json.loads(gzip.decompress(item["data"]))}
 
 
+def decisions(conn, requested, before=None, limit=24, outcome_filter="all"):
+    filters = {
+        "all": (), "trades": ("open", "close", "reverse", "liquidate"),
+        "skipped": ("skipped",), "held": ("hold", "flat"),
+    }
+    if outcome_filter not in filters or (before is not None and not 0 <= before < 2**63):
+        raise ValueError("Invalid decisions query")
+    limit = min(100, max(1, limit))
+    selected = get_asset(conn, requested)
+    if not selected:
+        return {"asset": None, "decisions": [], "next_before": None, "audit_started_at": None}
+    asset = selected["id"]
+    upper = 2**63 - 1 if before is None else before
+    start = conn.execute("SELECT MIN(bucket) FROM paper_decisions WHERE asset=?", (asset,)).fetchone()[0]
+    outcomes = filters[outcome_filter]
+    where_outcome = f" AND d.outcome IN ({','.join('?' for _ in outcomes)})" if outcomes else ""
+    rows = conn.execute(f"""
+        SELECT d.bucket,d.outcome,d.details,r.observed_at,e.equity,e.cash
+        FROM paper_decisions d
+        JOIN rounds r ON r.bucket=d.bucket
+        LEFT JOIN paper_equity e ON e.bucket=d.bucket AND e.symbol=d.asset
+        WHERE d.asset=? AND d.bucket<?{where_outcome}
+        ORDER BY d.bucket DESC LIMIT ?
+    """, (asset, upper, *outcomes, limit + 1)).fetchall()
+    if len(rows) <= limit and outcome_filter in ("all", "trades"):
+        # Before auditing starts, show actual fills only. Signal and strategy details
+        # from then are unavailable, and the absence of a fill proves no reason.
+        rows.extend(conn.execute("""
+            SELECT t.bucket,NULL AS outcome,NULL AS details,r.observed_at,e.equity,e.cash,
+                   s.observed_at AS signal_at,s.source_at,q.price,q.mark_price,q.symbol AS contract
+            FROM (
+                SELECT DISTINCT bucket FROM paper_trades WHERE symbol=? AND bucket<?
+                ORDER BY bucket DESC LIMIT ?
+            ) t
+            LEFT JOIN rounds r ON r.bucket=t.bucket
+            LEFT JOIN paper_equity e ON e.bucket=t.bucket AND e.symbol=?
+            LEFT JOIN snapshots s ON s.bucket=t.bucket AND s.asset=?
+            LEFT JOIN quotes q ON q.bucket=t.bucket AND q.asset=?
+            ORDER BY t.bucket DESC
+        """, (asset, min(upper, start) if start is not None else upper, limit + 1 - len(rows),
+              asset, asset, asset)))
+    page = rows[:limit]
+    fills = {}
+    traded_buckets = [row["bucket"] for row in page if row["outcome"] not in ("hold", "flat", "skipped")]
+    if traded_buckets:
+        placeholders = ",".join("?" for _ in traded_buckets)
+        for trade in conn.execute(f"""
+            SELECT bucket,id,action,side,price,quantity,fee,realized_pnl,net_pnl,
+                   funding_pnl,observed_at,reason
+            FROM paper_trades WHERE symbol=? AND bucket IN ({placeholders}) ORDER BY bucket DESC,id
+        """, (asset, *traded_buckets)):
+            trade = dict(trade)
+            fills.setdefault(trade.pop("bucket"), []).append(trade)
+    result = []
+    for row in page:
+        bucket = row["bucket"]
+        trades = fills.get(bucket, [])
+        legacy = row["details"] is None
+        if legacy:
+            first, last = trades[0], trades[-1]
+            details = {key: row[key] for key in ("signal_at", "source_at", "price", "mark_price", "contract")}
+            details.update(quote_at=None, probability=None, rule=None, target_side=None,
+                           previous_side=0 if first["action"] == "open" else first["side"],
+                           result_side=last["side"] if last["action"] == "open" else 0,
+                           reason="legacy_fill", skip_reason=None)
+        else:
+            details = json.loads(row["details"])
+        observed_at = row["observed_at"]
+        if observed_at is None and trades:
+            observed_at = trades[0]["observed_at"]
+        result.append(dict(details, bucket=bucket, observed_at=observed_at,
+                           equity=row["equity"], cash=row["cash"], trades=trades, legacy=legacy,
+                           outcome=executed_outcome(trades) if legacy else row["outcome"]))
+    return {"asset": asset, "decisions": result, "audit_started_at": start,
+            "next_before": page[-1]["bucket"] if len(rows) > limit else None}
+
+
 def serve(db, config_path, addr, port):
     class Handler(BaseHTTPRequestHandler):
         def reply(self, status, body, mime="application/json; charset=utf-8"):
@@ -637,6 +802,11 @@ def serve(db, config_path, addr, port):
                         default = load_config(config_path)["rule"].get("period", "5m")
                         timeframe = values.get("timeframe", [default])[0]
                         self.json(200, history(conn, asset, hours, timeframe, before))
+                    elif url.path == "/api/decisions":
+                        limit = int(values.get("limit", ["24"])[0])
+                        before = int(values["before"][0]) if "before" in values else None
+                        outcome_filter = values.get("filter", ["all"])[0]
+                        self.json(200, decisions(conn, asset, before, limit, outcome_filter))
                     elif url.path == "/api/snapshot":
                         at = int(values["at"][0]) if "at" in values else None
                         result = get_snapshot(conn, asset, at)
