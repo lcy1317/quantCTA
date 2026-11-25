@@ -3,160 +3,222 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="light">
   <title>Quant · CTA 因子与模拟盘</title>
   <style>
     :root {
-      color-scheme: dark;
-      --bg: #020617; --card: #0e1223; --input: #151d31; --line: #334155;
-      --text: #f8fafc; --muted: #aebbd0; --green: #64e4ba; --blue: #9ec5ff;
-      --amber: #ffd085; --red: #ff9ea9;
-      --mono: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color-scheme: light;
+      --bg: #f5f6f8; --card: #fff; --input: #f3f5f8; --line: #dce1e9; --grid: #e6ebf3;
+      --text: #181d26; --muted: #526071; --green: #087553; --blue: #075dbd;
+      --amber: #925300; --red: #ae3546; --focus: #1267ce;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --ease: cubic-bezier(.22, .68, .24, 1);
       color: var(--text); background: var(--bg);
-      font: 16px/1.55 "Fira Sans", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      scroll-behavior: smooth; scroll-padding-top: 84px;
     }
     * { box-sizing: border-box; }
     body { margin: 0; }
     h1, h2, p, figure { margin: 0; }
-    h1 { font-size: clamp(31px, 4.5vw, 56px); line-height: 1.14; font-weight: 720; letter-spacing: -.04em; }
-    h2 { font-size: 19px; }
-    button, select, input {
-      min-height: 44px; padding: 7px 12px; font: inherit; color: var(--text);
-      background: var(--input); border: 1px solid var(--line); border-radius: 8px; font-size: 14px;
-      transition: background-color 140ms ease, border-color 140ms ease;
+    h1 { font-size: clamp(41px, 5.3vw, 75px); line-height: 1.11; font-weight: 760; letter-spacing: -.057em; }
+    h2 { font-size: clamp(21px, 2vw, 28px); font-weight: 700; letter-spacing: -.035em; }
+    button, select, input, .hero-cta {
+      min-height: 44px; padding: 8px 13px; font: inherit; color: var(--text);
+      background: var(--input); border: 1px solid var(--line); border-radius: 10px; font-size: 14px;
+      transition: background-color 160ms var(--ease), border-color 160ms var(--ease), color 160ms var(--ease), transform 160ms var(--ease);
     }
     button, select, summary { cursor: pointer; }
-    button:hover, select:hover { border-color: var(--muted); }
-    :focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
-    button:disabled, select:disabled, input:disabled { opacity: .65; cursor: default; }
+    button:hover, select:hover { background: #e8edf4; border-color: #b4c2d3; }
+    button:not(:disabled):active, .hero-cta:active { transform: scale(.98); }
+    :focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+    button:disabled, select:disabled, input:disabled { opacity: .62; cursor: default; }
     [hidden] { display: none !important; }
-    .shell { max-width: 1440px; margin: auto; padding-inline: clamp(14px, 4vw, 56px); }
-    .top { background: var(--card); border-bottom: 1px solid var(--line); }
-    .top header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 10px; min-height: 67px; }
-    .brand { display: flex; align-items: center; gap: 10px; font: 700 19px/1.3 var(--mono); letter-spacing: -.055em; }
-    .brand::before { content: ""; width: 23px; height: 23px; border-radius: 6px; background:
-      linear-gradient(90deg, transparent 23%, var(--bg) 23% 34%, transparent 34% 47%, var(--bg) 47% 58%, transparent 58% 71%, var(--bg) 71% 82%, transparent 82%) center / 100% 40% no-repeat, var(--green); }
-    .page-nav, .controls { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
-    .page-nav { margin-right: auto; gap: 4px; }
-    .page-nav a { display: grid; place-items: center; min-height: 44px; padding: 0 11px; border-radius: 8px;
-      color: var(--muted); text-decoration: none; font-size: 14px; }
+    .shell { max-width: 1360px; margin-inline: auto; padding-inline: clamp(14px, 4.5vw, 64px); }
+    .top { background: #fbfcfd; border-bottom: 1px solid #dfe4eb; position: sticky; top: 0; z-index: 5; }
+    @supports (backdrop-filter: blur(16px)) {
+      .top { background: rgb(251 252 253 / .86); backdrop-filter: saturate(150%) blur(16px); }
+    }
+    .top header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 7px; min-height: 60px; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none;
+      font-size: 17px; font-weight: 750; letter-spacing: -.044em; white-space: nowrap; }
+    .brand::before { content: ""; width: 25px; height: 25px; border-radius: 8px; background:
+      linear-gradient(90deg, transparent 18%, #fff 18% 29%, transparent 29% 45%, #fff 45% 56%,
+        transparent 56% 72%, #fff 72% 83%, transparent 83%) center / 100% 38% no-repeat, #1466c5; }
+    .page-nav, .controls { display: flex; flex-wrap: wrap; align-items: end; gap: 9px; }
+    .page-nav { margin-right: auto; align-items: center; gap: 3px; }
+    .page-nav a { display: grid; place-items: center; min-height: 44px; padding: 0 11px; border-radius: 9px;
+      color: var(--muted); text-decoration: none; font-size: 14px; transition: background-color 160ms var(--ease), color 160ms var(--ease); }
     .page-nav a:hover { background: var(--input); color: var(--text); }
-    .status { display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 20px;
-      color: var(--muted); white-space: nowrap; margin-block: auto; font-size: 12px; }
+    .page-nav a[aria-current] { color: var(--blue); background: #e7effb; }
+    .status { display: inline-flex; align-items: center; gap: 7px; align-self: center; padding: 5px 9px; border: 1px solid var(--line);
+      border-radius: 40px; color: var(--muted); background: var(--card); white-space: nowrap; font-size: 12px; }
     .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
     .positive, .status[data-kind="good"] { color: var(--green); }
     .negative, .status[data-kind="bad"] { color: var(--red); }
     .status[data-kind="warn"] { color: var(--amber); }
-    main { padding-block: 29px 64px; }
-    section[id] { scroll-margin-top: 15px; }
-    .intro, .section-head { display: flex; align-items: end; justify-content: space-between; gap: 15px; margin-bottom: 16px; }
-    .intro { border: 1px solid var(--line); border-radius: 16px; padding: clamp(15px, 3vw, 32px);
-      background: radial-gradient(ellipse at 92% 18%, #1b31527d, transparent 59%), linear-gradient(111deg, var(--card), #111a31);
-    }
-    .intro .note { max-width: 75ch; }
-    .intro .controls { min-width: min(100%, 205px); align-items: normal; flex-direction: column; }
+    main { padding-block: clamp(18px, 3vw, 38px) 68px; }
+    section[id] { scroll-margin-top: 12px; }
+    .intro { display: grid; grid-template-columns: minmax(0, 1.06fr) minmax(0, 1fr); align-items: center;
+      gap: clamp(22px, 3.8vw, 56px); margin-bottom: 24px; padding: clamp(25px, 4.6vw, 62px); border-radius: 28px;
+      overflow: hidden; isolation: isolate; border: 1px solid #e4e8ee;
+      background: radial-gradient(ellipse at 78% 5%, #e2edff, transparent 57%), linear-gradient(133deg, #fff 10%, #f3f6fb 100%); }
+    .hero-copy { min-width: 0; position: relative; z-index: 1; }
+    .hero-title { text-wrap: balance; }
+    .hero-title span { color: var(--blue); }
+    .intro .note { max-width: 56ch; margin-top: 13px; font-size: clamp(13px, 1.2vw, 15px); }
+    .intro .controls { margin-top: 19px; align-items: end; gap: 11px; }
+    .intro .controls .note { margin: 0; }
+    .intro label { color: var(--muted); }
+    .hero-cta { display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 5px 12px #075dbd23;
+      color: #fff; background: var(--blue); border-color: transparent; border-radius: 30px; text-decoration: none; padding-inline: 16px; }
+    .hero-cta:hover { background: #064e9e; }
+    .hero-stage { min-width: 0; position: relative; display: grid; place-items: center; isolation: isolate; }
+    .stage-orbit { pointer-events: none; position: absolute; z-index: -1; width: 104%; aspect-ratio: 1.85;
+      border-radius: 50%; transform: rotate(-15deg); border: 1px solid #adc8ec;
+      background: radial-gradient(ellipse at 66% 75%, #abc8f35c, transparent 68%);
+      box-shadow: 0 0 0 16px #a9c2e024, 0 0 0 33px #b3c9e719, 0 0 0 50px #d3e3f513;
+      translate: var(--drift-x, 0px) var(--drift-y, 0px); transition: translate 420ms var(--ease); }
+    .stage-panel { width: min(100%, 470px); position: relative; padding: clamp(17px, 2.25vw, 28px); border-radius: 23px;
+      background: linear-gradient(146deg, #fff, #f8fbff 88%); border: 1px solid #fff;
+      box-shadow: 0 0 0 1px #d9e3f1, 0 22px 52px -31px #1b498f7d, 0 10px 20px -15px #25487142; }
+    .stage-top, .stage-decision { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+    .stage-top { color: var(--muted); font-size: 13px; }
+    #hero-asset { color: var(--text); font-weight: 700; font-size: 15px; }
+    .stage-metric { margin-block: 9px 5px; color: var(--muted); font-size: 13px; }
+    #hero-equity { display: block; color: var(--text); font-weight: 720; font-size: clamp(31px, 4.25vw, 52px);
+      line-height: 1.13; letter-spacing: -.055em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    #hero-sparkline { display: block; width: 100%; height: clamp(64px, 8vw, 100px); }
+    .stage-decision { color: var(--muted); font-size: 13px; border-top: 1px solid var(--grid); padding-top: 11px; }
+    .stage-decision > div { display: grid; gap: 2px; }
+    .stage-decision > div:nth-child(2) { text-align: right; }
+    #hero-outcome { color: var(--blue); font-weight: 690; }
+    #hero-outcome[data-tone="long"] { color: var(--green); }
+    #hero-outcome[data-tone="short"], #hero-outcome[data-tone="liquidate"] { color: var(--red); }
+    #hero-outcome[data-tone="skipped"] { color: var(--amber); }
+    #hero-probability { font-variant-numeric: tabular-nums; }
+    #hero-rationale { flex-basis: 100%; overflow-wrap: anywhere; }
+    .section-head { display: flex; align-items: end; justify-content: space-between; gap: 15px; margin-bottom: 15px; }
     .note { font-size: 13px; color: var(--muted); margin-top: 4px; overflow-wrap: anywhere; }
-    .alert { margin: 0 0 12px; padding: 9px 12px; color: var(--amber); background: #262119; border: 1px solid #674f2f; border-radius: 8px; overflow-wrap: anywhere; }
-    .metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin: 0 0 16px; }
-    .metric, .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
-    .metric { padding: 13px 15px; }
+    .alert { margin: 0 0 13px; padding: 9px 12px; color: var(--amber); background: #fff4e2; border: 1px solid #edd2ab; border-radius: 9px; overflow-wrap: anywhere; }
+    .metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin: 0 0 18px; }
+    .metric, .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; min-width: 0; }
+    .metric { padding: 12px 14px; background: #f8fafd; }
     .metric dt, .metric small { color: var(--muted); }
-    .metric small.positive { color: var(--green); }
-    .metric small.negative { color: var(--red); }
+    .metric small.positive { color: var(--green); } .metric small.negative { color: var(--red); }
     .metric dt, .metric small { font-size: 12px; }
-    .metric dd { font: 650 clamp(17px, 2vw, 26px)/1.45 var(--mono); margin: 4px 0 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .metric dd { margin: 4px 0 0; font-size: clamp(17px, 1.95vw, 28px); font-weight: 710; letter-spacing: -.035em;
+      font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
     .metric small { display: block; margin-top: 2px; overflow-wrap: anywhere; }
-    .card { padding: clamp(12px, 2vw, 22px); margin-bottom: 16px; }
-    label { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: 12px; max-width: 100%; }
+    .card { padding: clamp(13px, 2.3vw, 29px); margin-bottom: 18px; }
+    label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; max-width: 100%; }
     label select, label input { max-width: 100%; }
-    #asset { min-width: 126px; }
+    #asset { min-width: 125px; }
     .columns, .chart-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
-    .chart-pair { padding-top: 14px; margin-top: 14px; border-top: 1px solid var(--line); }
+    .chart-pair { padding-top: 17px; margin-top: 17px; border-top: 1px solid var(--line); }
     figcaption { min-height: 21px; display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 13px; }
     .legend::before { content: ""; display: inline-block; vertical-align: 1px; width: 8px; height: 8px; border-radius: 100%; background: var(--legend); margin-right: 6px; }
     .chart { position: relative; }
     .chart canvas { display: block; width: 100%; height: 180px; }
-    .chart.equity canvas { height: 232px; }
+    .chart.equity canvas { height: 236px; }
     .chart-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); pointer-events: none; }
-    .chart-tip { position: absolute; top: 5px; z-index: 1; padding: 5px 7px; background: var(--bg); border: 1px solid var(--line); border-radius: 7px; pointer-events: none; font-size: 12px; white-space: nowrap; }
-    .table-scroll { overflow: auto; max-height: 300px; scrollbar-color: var(--line) var(--card); }
+    .chart-tip { position: absolute; top: 5px; z-index: 1; padding: 5px 7px; background: var(--card); border: 1px solid var(--line);
+      box-shadow: 0 2px 8px #182e4a13; border-radius: 7px; pointer-events: none; font-size: 12px; white-space: nowrap; }
+    .table-scroll { overflow: auto; max-height: 300px; scrollbar-color: #b9c5d4 var(--card); }
     table { border-collapse: collapse; width: 100%; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
     td, th { text-align: start; padding: 8px 9px; border-bottom: 1px solid var(--line); }
-    th { color: var(--muted); font-weight: 550; position: sticky; top: 0; background: var(--card); }
+    th { color: var(--muted); font-weight: 610; position: sticky; top: 0; background: var(--card); }
     tbody tr:last-child td { border-bottom: 0; }
     td.empty { color: var(--muted); white-space: normal; }
-    .asset-link { color: var(--blue); background: transparent; padding: 1px 0; border: 0; border-radius: 2px; font-weight: 550; }
-    .asset-link:hover { text-decoration: underline; }
-    .payload { max-height: 440px; overflow: auto; color: var(--muted); padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
-    .json-children { margin-left: 11px; padding-left: 11px; border-left: 1px solid var(--line); }
+    .asset-link { color: var(--blue); background: transparent; padding: 1px 0; border: 0; border-radius: 3px; font-weight: 600; }
+    .asset-link:hover { background: transparent; text-decoration: underline; }
+    .payload { max-height: 440px; overflow: auto; color: var(--muted); padding: 12px; background: #f7f9fc; border: 1px solid var(--line); border-radius: 10px; }
+    .json-children { margin-left: 11px; padding-left: 11px; border-left: 1px solid #d2dce9; }
     .json-key, .payload summary { color: var(--blue); overflow-wrap: anywhere; }
-    .json-leaf, pre { font: 13px/1.6 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
-    .json-leaf span + span { color: var(--text); }
-    .raw { margin-top: 9px; color: var(--muted); }
-    pre { max-height: 440px; overflow: auto; }
-    .decision-filters { display: flex; gap: 8px; flex-wrap: wrap; }
-    .decision-filters button { color: var(--muted); }
-    .decision-filters button[aria-pressed="true"] { color: var(--blue); border-color: var(--blue); background: #1a2c4c; }
+    .json-leaf, pre { font: 13px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .json-leaf span + span { color: var(--text); } .raw { margin-top: 9px; color: var(--muted); } pre { max-height: 440px; overflow: auto; }
+    .decision-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+    .decision-filters button { color: var(--muted); border-radius: 24px; }
+    .decision-filters button[aria-pressed="true"] { color: #fff; border-color: var(--blue); background: var(--blue); }
     .decision-labels, .decision-row {
-      display: grid; grid-template-columns: minmax(100px, .75fr) minmax(105px, .8fr) minmax(240px, 2fr)
-        minmax(80px, .6fr) minmax(90px, .65fr) 18px; gap: 12px; align-items: center;
+      display: grid; grid-template-columns: minmax(90px, .73fr) minmax(101px, .78fr) minmax(199px, 2fr) minmax(74px, .6fr) minmax(85px, .7fr) 15px;
+      gap: 11px; align-items: center;
     }
-    .decision-labels { padding: 7px 12px; color: var(--muted); font-size: 12px; }
+    .decision-labels { padding: 6px 12px; color: var(--muted); font-size: 12px; }
     .decision-list { display: grid; gap: 6px; }
-    .decision { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
-    .decision[open] { border-color: var(--blue); }
-    .decision-row { list-style: none; min-height: 61px; padding: 8px 12px; font-size: 14px; }
+    .decision { background: #fbfcfe; border: 1px solid var(--line); border-radius: 11px; min-width: 0; }
+    .decision[open] { border-color: #97b9e5; }
+    .decision-row { list-style: none; min-height: 61px; padding: 8px 12px; border-radius: 10px; font-size: 14px; transition: background-color 180ms var(--ease); }
     .decision-row::-webkit-details-marker { display: none; }
-    .decision-row:hover { background: var(--input); border-radius: 9px; }
-    .decision-row::after { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted);
-      border-bottom: 2px solid var(--muted); transform: rotate(45deg); justify-self: center; margin-top: -4px; }
-    .decision[open] .decision-row::after { transform: rotate(225deg); margin-top: 4px; }
+    .decision-row:hover, .decision[open] .decision-row { background: #eef4fc; }
+    .decision-row::after { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+      transform: translateY(-2px) rotate(45deg); justify-self: center; transition: transform 230ms var(--ease); }
+    .decision[open] .decision-row::after { transform: translateY(2px) rotate(225deg); }
     .decision-row time, .data-number { font: 13px/1.45 var(--mono); font-variant-numeric: tabular-nums; }
     .decision-row time small { color: var(--muted); display: block; font-size: 11px; }
-    .decision-pill { justify-self: start; padding: 4px 8px; border-radius: 6px; background: var(--input);
+    .decision-pill { justify-self: start; padding: 4px 8px; border-radius: 7px; background: #eaf0f7;
       font-size: 13px; font-weight: 650; color: var(--muted); }
-    .decision-pill[data-tone="long"] { color: var(--green); background: #10352f; }
-    .decision-pill[data-tone="short"], .decision-pill[data-tone="liquidate"] { color: var(--red); background: #3d2233; }
-    .decision-pill[data-tone="close"] { color: var(--blue); background: #1b2a48; }
-    .decision-pill[data-tone="skipped"] { color: var(--amber); background: #322918; }
-    .decision-reason { min-width: 0; overflow-wrap: anywhere; }
-    .decision-reason small { display: block; color: var(--muted); }
+    .decision-pill[data-tone="long"] { color: var(--green); background: #e6f5ee; }
+    .decision-pill[data-tone="short"], .decision-pill[data-tone="liquidate"] { color: var(--red); background: #fbecee; }
+    .decision-pill[data-tone="close"] { color: var(--blue); background: #e6effc; }
+    .decision-pill[data-tone="skipped"] { color: var(--amber); background: #fff2de; }
+    .decision-reason { min-width: 0; overflow-wrap: anywhere; } .decision-reason small { display: block; color: var(--muted); }
     .decision-content { border-top: 1px solid var(--line); padding: 12px; }
-    .decision-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; gap: 10px 14px; }
-    .decision-facts div { background: var(--card); border-radius: 7px; padding: 8px 10px; }
+    .decision[open] .decision-content { animation: disclose 250ms var(--ease) both; }
+    @supports (interpolate-size: allow-keywords) and selector(details::details-content) {
+      .decision::details-content { block-size: 0; overflow: clip; interpolate-size: allow-keywords;
+        transition: block-size 315ms var(--ease), content-visibility 315ms allow-discrete; }
+      .decision[open]::details-content { block-size: auto; }
+      .decision[open] .decision-content { animation: none; }
+    }
+    .decision-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; gap: 9px 12px; }
+    .decision-facts div { background: #f0f4f9; border-radius: 8px; padding: 9px 11px; }
     .decision-facts dt { color: var(--muted); font-size: 12px; }
     .decision-facts dd { margin: 2px 0 0; font-size: 14px; overflow-wrap: anywhere; }
     .decision-fills, .decision-content > button { margin-top: 12px; }
-    .decision-paging { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 8px; }
+    .decision-paging { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; margin-top: 10px; gap: 8px; }
     .decision-paging button { margin-left: auto; }
-    .empty-state { padding: 24px 12px; border: 1px dashed var(--line); border-radius: 9px; color: var(--muted); }
+    .empty-state { padding: 24px 12px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); }
+    .hero-copy { animation: enter 590ms 35ms var(--ease) both; }
+    .stage-panel { animation: stage-in 700ms 140ms var(--ease) both; }
+    .stage-orbit { animation: orbit-in 800ms 100ms var(--ease) both; }
+    .reveal-on-scroll.has-entered { animation: enter 480ms var(--ease) both; }
+    @keyframes enter { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes stage-in { from { opacity: 0; transform: translateY(22px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    @keyframes orbit-in { from { opacity: 0; transform: rotate(-20deg) scale(.9); } to { opacity: 1; transform: rotate(-15deg) scale(1); } }
+    @keyframes disclose { from { opacity: .45; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
     @media (max-width: 960px) { .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
     @media (max-width: 830px) {
+      .intro { gap: 25px; }
       .columns, .chart-pair { grid-template-columns: minmax(0, 1fr); }
       .columns { gap: 0; }
-      .decision-labels, .decision-row { grid-template-columns: 82px 90px minmax(0, 1.3fr) 66px 75px 11px; gap: 9px; }
+      .decision-labels, .decision-row { grid-template-columns: 80px 91px minmax(0, 1.3fr) 65px 75px 11px; gap: 9px; }
     }
     @media (max-width: 680px) {
-      .top header { flex-wrap: wrap; }
-      .top .controls { order: 1; }
-      .page-nav { order: 2; width: 100%; border-top: 1px solid var(--line); }
+      :root { scroll-padding-top: 115px; }
+      .top header { flex-wrap: wrap; gap: 4px 10px; }
+      .top .controls { order: 1; } .page-nav { order: 2; width: 100%; border-top: 1px solid var(--line); }
+      .intro { grid-template-columns: minmax(0, 1fr); border-radius: 21px; }
+      .hero-stage { margin-block: 3px; }
       .decision-labels, .decision-equity { display: none; }
-      .decision-row { grid-template-columns: minmax(64px, .75fr) minmax(70px, 1fr) minmax(54px, .7fr) 12px; gap: 4px 8px; }
-      .decision-probability::before { content: "看多"; display: block; font: 12px/1.4 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; color: var(--muted); }
+      .decision-row { grid-template-columns: minmax(68px, .75fr) minmax(68px, 1fr) minmax(53px, .7fr) 10px; gap: 5px 7px; }
+      .decision-probability::before { content: "看多"; display: block; font: 12px/1.4 system-ui, sans-serif; color: var(--muted); }
       .decision-reason { grid-row: 2; grid-column: 1 / -1; }
       .decision-row::after { grid-column: 4; grid-row: 1; }
       .decision-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 560px) {
-      .intro, .section-head { flex-direction: column; align-items: start; gap: 8px; }
-      .intro .controls { width: 100%; }
+      .section-head { flex-direction: column; align-items: start; gap: 9px; }
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-      .metric { padding: 11px; }
-      .decision-filters { width: 100%; }
-      .decision-filters button { flex: 1 1 auto; }
-      .chart.equity canvas { height: 195px; }
+      .metric { padding: 10px; }
+      .decision-filters { width: 100%; } .decision-filters button { flex: 1 1 auto; }
+      .chart.equity canvas { height: 196px; }
     }
-    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+    @media (prefers-reduced-transparency: reduce) { .top { background: #fbfcfd; backdrop-filter: none; } }
+    @media (prefers-reduced-motion: reduce) {
+      :root { scroll-behavior: auto; }
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .decision::details-content { transition: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -171,22 +233,31 @@
   </div>
   <main class="shell">
     <header class="intro">
-      <div><h1>CTA 模拟盘</h1><p id="strategy" class="note">正在读取模拟盘设置</p></div>
-      <div class="controls">
-        <label>当前币种<select id="asset" disabled><option value="">等待采集</option></select></label>
+      <div class="hero-copy">
+        <h1 class="hero-title">模拟决策，<br><span>逐轮可见。</span></h1>
+        <p id="strategy" class="note">正在读取模拟盘设置</p>
+        <div class="controls">
+          <label>当前币种<select id="asset" disabled><option value="">等待采集</option></select></label>
+          <a class="hero-cta" href="#decisions">查看决策 <span aria-hidden="true">↓</span></a>
+        </div>
         <p id="updated" class="note">最近采集 —</p>
+      </div>
+      <div class="hero-stage" role="group" aria-labelledby="hero-asset">
+        <div class="stage-orbit" aria-hidden="true"></div>
+        <div class="stage-panel">
+          <div class="stage-top"><strong id="hero-asset">账户概览</strong><time id="hero-updated">—</time></div>
+          <div class="stage-metric"><span>账户净值</span><strong id="hero-equity">—</strong><small>USDT</small></div>
+          <canvas id="hero-sparkline" role="img" aria-label="账户净值近期走势"></canvas>
+          <div class="stage-decision">
+            <div><small>最新决策</small><strong id="hero-outcome">等待采样</strong></div>
+            <div><small>看多概率</small><strong id="hero-probability">—</strong></div>
+            <p id="hero-rationale">五分钟更新</p>
+          </div>
+        </div>
       </div>
     </header>
     <div id="service-alert" class="alert" role="status" hidden></div>
-    <dl class="metrics" aria-label="所选币种账户概要">
-        <div class="metric"><dt>账户净值</dt><dd id="equity">—</dd><small id="return">累计回报 —</small></div>
-        <div class="metric"><dt>已实现盈亏</dt><dd id="realized">—</dd><small>USDT</small></div>
-        <div class="metric"><dt>未实现盈亏</dt><dd id="unrealized">—</dd><small>USDT</small></div>
-        <div class="metric"><dt>平仓胜率</dt><dd id="win-rate">—</dd><small id="closed-count">已平仓 —</small></div>
-        <div class="metric"><dt>可用余额</dt><dd id="cash">—</dd><small>USDT</small></div>
-        <div class="metric"><dt>当前持仓数</dt><dd id="positions-count">—</dd><small id="selected-label">等待币种</small></div>
-    </dl>
-    <section id="decisions" class="card" aria-labelledby="decisions-title">
+    <section id="decisions" class="card reveal-on-scroll" aria-labelledby="decisions-title">
       <header class="section-head">
         <div><h2 id="decisions-title">模拟决策记录</h2><p id="decision-note" class="note">每轮展示信号、仓位变化和执行原因 · 北京时间</p></div>
         <div class="decision-filters" role="group" aria-label="按决策结果筛选">
@@ -207,7 +278,7 @@
         <button id="more-decisions" type="button" hidden>更早的决策</button>
       </div>
     </section>
-    <section id="account" class="card" aria-labelledby="account-title">
+    <section id="account" class="card reveal-on-scroll" aria-labelledby="account-title">
       <header class="section-head">
         <div><h2 id="account-title">账户表现</h2><p id="history-note" class="note">时间按北京时间显示</p></div>
         <div class="controls">
@@ -217,6 +288,14 @@
           <button id="live" type="button" hidden>回到最新</button>
         </div>
       </header>
+      <dl class="metrics" aria-label="所选币种账户概要">
+        <div class="metric"><dt>账户净值</dt><dd id="equity">—</dd><small id="return">累计回报 —</small></div>
+        <div class="metric"><dt>已实现盈亏</dt><dd id="realized">—</dd><small>USDT</small></div>
+        <div class="metric"><dt>未实现盈亏</dt><dd id="unrealized">—</dd><small>USDT</small></div>
+        <div class="metric"><dt>平仓胜率</dt><dd id="win-rate">—</dd><small id="closed-count">已平仓 —</small></div>
+        <div class="metric"><dt>可用余额</dt><dd id="cash">—</dd><small>USDT</small></div>
+        <div class="metric"><dt>当前持仓数</dt><dd id="positions-count">—</dd><small id="selected-label">等待币种</small></div>
+      </dl>
       <div id="history-alert" class="alert" role="status" hidden></div>
       <figure>
         <figcaption><span class="legend" style="--legend: var(--green)">账户净值（USDT）</span><span id="equity-readout"></span></figcaption>
@@ -233,7 +312,7 @@
       </figure>
       </div>
     </section>
-    <div class="columns">
+    <div class="columns reveal-on-scroll">
       <section class="card" aria-labelledby="positions-title">
         <header class="section-head"><h2 id="positions-title">当前持仓</h2></header>
         <div class="table-scroll" tabindex="0" aria-label="当前持仓表"><table>
@@ -247,13 +326,13 @@
         </table></div>
       </section>
     </div>
-    <section id="comparison" class="card" aria-labelledby="comparison-title" hidden>
+    <section id="comparison" class="card reveal-on-scroll" aria-labelledby="comparison-title" hidden>
       <header class="section-head"><h2 id="comparison-title">各币种账户</h2></header>
       <div class="table-scroll" tabindex="0" aria-label="各币种账户表"><table>
         <thead><tr><th scope="col">币种</th><th scope="col">净值（USDT）</th><th scope="col">累计回报</th><th scope="col">平仓胜率</th><th scope="col">已平仓数</th></tr></thead><tbody id="accounts"></tbody>
       </table></div>
     </section>
-    <section id="archive-section" class="card" aria-labelledby="archive-title">
+    <section id="archive-section" class="card reveal-on-scroll" aria-labelledby="archive-title">
       <header class="section-head">
         <div><h2 id="archive-title" tabindex="-1">因子快照回溯</h2><p id="archive-note" class="note">按上方币种筛选</p></div>
         <div class="controls">
@@ -287,10 +366,12 @@
     const roundDate = new Intl.DateTimeFormat("zh-CN", {
       timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit"
     });
+    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
     const state = {
       latest: null, snapshots: [], snapshot: null, options: null, overview: null,
       history: null, archive: null, archivePin: null, historyKey: null, timeframeSet: false,
-      audit: {filter: "all", request: null, stack: [], next: null, key: null}
+      audit: {filter: "all", request: null, stack: [], next: null, key: null},
+      hero: {request: null, key: null, points: []}
     };
 
     function measure(value) {
@@ -411,12 +492,95 @@
       liquidate: "模拟强平", hold: "继续持" + sideLabel(row.result_side),
       flat: "继续观望", skipped: "未执行"
     })[row.outcome] || "决策";
+    const decisionTone = (row) => ["open", "reverse", "hold"].includes(row.outcome) ?
+      (row.result_side === 1 ? "long" : "short") : row.outcome;
 
     function node(tag, className, value) {
       const result = document.createElement(tag);
       if (className) result.className = className;
       if (value !== undefined) result.textContent = value;
       return result;
+    }
+
+    function renderHeroDecision(row) {
+      const heading = el("hero-outcome");
+      const title = row ? decisionTitle(row) : "等待采样";
+      if (heading.textContent !== title) {
+        heading.textContent = title;
+        if (!reduceMotion.matches) heading.animate(
+          [{opacity: .45, transform: "translateY(5px)"}, {opacity: 1, transform: "translateY(0)"}],
+          {duration: 240, easing: "cubic-bezier(.2,.8,.2,1)"}
+        );
+      }
+      heading.dataset.tone = row ? decisionTone(row) : "";
+      text("hero-probability", format(row?.probability, percent));
+      text("hero-rationale", row ? formatTime(row.bucket, roundClock) + " · " + reasonLabel(row.reason) : "五分钟采样");
+    }
+
+    async function loadHeroDecision(force) {
+      const hero = state.hero;
+      const asset = el("asset").value;
+      if (!asset) return;
+      const key = JSON.stringify([asset, state.latest]);
+      if (!force && hero.key === key) return;
+      hero.request?.abort();
+      const request = new AbortController();
+      hero.request = request;
+      try {
+        const data = await get("decisions", {asset, limit: 1, filter: "all"}, request);
+        if (request.signal.aborted) return;
+        renderHeroDecision(list(data.decisions)[0]);
+        hero.key = key;
+      } catch {
+        // Keep the most recent verified summary while the next refresh retries.
+      }
+    }
+
+    function drawHeroSparkline() {
+      const canvas = el("hero-sparkline");
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      if (!width || !height) return;
+      const ratio = Math.min(2, devicePixelRatio || 1);
+      const w = Math.round(width * ratio), h = Math.round(height * ratio);
+      if (canvas.width !== w) canvas.width = w;
+      if (canvas.height !== h) canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "#e0eaf4";
+      for (const y of [height * .2, height * .5, height * .8]) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+      const points = state.hero.points;
+      if (!points.length) {
+        canvas.setAttribute("aria-label", "近期账户净值暂无数据");
+        return;
+      }
+      const high = Math.max(...points.map((p) => p.equity));
+      const low = Math.min(...points.map((p) => p.equity));
+      const start = points[0].at, end = points.at(-1).at;
+      const x = (p) => end === start ? width - 6 : 6 + (width - 12) * (p.at - start) / (end - start);
+      const y = (p) => high === low ? height / 2 : 9 + (height - 18) * (high - p.equity) / (high - low);
+      ctx.beginPath();
+      points.forEach((p, i) => {
+        if (!i || p.at - points[i - 1].at > 450) ctx.moveTo(x(p), y(p));
+        else ctx.lineTo(x(p), y(p));
+      });
+      ctx.strokeStyle = "#0066cc";
+      ctx.lineWidth = 2;
+      ctx.lineJoin = "round";
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x(points.at(-1)), y(points.at(-1)), 4, 0, Math.PI * 2);
+      ctx.fillStyle = "#0066cc";
+      ctx.fill();
+      canvas.setAttribute("aria-label", "最近 " + points.length + " 次采样的账户净值，最新 " +
+        format(points.at(-1).equity, money) + " USDT");
     }
 
     function decisionCard(row, expanded) {
@@ -428,8 +592,7 @@
       when.dateTime = new Date(row.bucket * 1000).toISOString();
       when.append(node("small", "", formatTime(row.bucket, roundDate)));
       const pill = node("span", "decision-pill", decisionTitle(row));
-      pill.dataset.tone = ["open", "reverse", "hold"].includes(row.outcome) ?
-        (row.result_side === 1 ? "long" : "short") : row.outcome;
+      pill.dataset.tone = decisionTone(row);
       const rationale = node("span", "decision-reason", reasonLabel(row.reason));
       rationale.append(node("small", "", positionSide(row.previous_side) + " → " + positionSide(row.result_side)));
       const probability = node("span", "data-number decision-probability", format(row.probability, percent));
@@ -507,6 +670,10 @@
       const rows = items.map((row) => decisionCard(row, expanded.has(String(row.bucket))));
       host.replaceChildren(...(rows.length ? rows : [node("p", "empty-state",
         data.asset ? "这个筛选下还没有记录。" : "等待首次采集。")]));
+      if (rows.length && !preserve && !reduceMotion.matches) host.animate(
+        [{opacity: .65, transform: "translateY(4px)"}, {opacity: 1, transform: "translateY(0)"}],
+        {duration: 220, easing: "ease-out"}
+      );
       if (active) {
         const replacement = rows.find((row) => row.dataset.bucket === active.dataset.bucket);
         replacement?.querySelector(focused.matches("button") ? "button" : "summary")?.focus({preventScroll: true});
@@ -669,6 +836,10 @@
       text("updated", "最近采集 " + formatTime(data.latest_at));
       el("updated").title = "来源时间 " + formatTime(data.source_at);
       renderAssets(list(data.assets), data.selected || data.asset);
+      text("hero-asset", el("asset").value ? el("asset").value + " 账户概览" : "账户概览");
+      text("hero-updated", formatTime(data.latest_at, roundClock));
+      if (data.latest_at) el("hero-updated").dateTime = new Date(data.latest_at * 1000).toISOString();
+      text("hero-equity", format(data.account?.equity, money));
       renderAccount(data.account || {}, list(data.positions), list(data.trades), !el("asset").value);
     }
 
@@ -755,8 +926,8 @@
         ctx.lineWidth = 1;
         ctx.textBaseline = "middle";
         ctx.textAlign = "right";
-        ctx.fillStyle = "#aab9c9";
-        ctx.strokeStyle = "#283747";
+        ctx.fillStyle = "#526278";
+        ctx.strokeStyle = "#e2e8f0";
         labels.forEach((label, i) => {
           const tickY = top + i / ticks * plotHeight;
           ctx.beginPath();
@@ -806,7 +977,7 @@
         const hoverX = x(this.hover.at);
         const value = measure(this.hover[this.name]);
         ctx.lineWidth = 1;
-        ctx.strokeStyle = "#7f91a7";
+        ctx.strokeStyle = "#6e8094";
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
         ctx.moveTo(hoverX, top);
@@ -824,9 +995,9 @@
     }
 
     const charts = [
-      new Chart("equity", "#5de4bf", (value, axis) => format(value, axis ? axisNumber : money)),
-      new Chart("price", "#85bcff", (value, axis) => format(value, axis ? axisNumber : number)),
-      new Chart("probability", "#ffd28d", (value) => percent.format(value), [0, 1])
+      new Chart("equity", "#137353", (value, axis) => format(value, axis ? axisNumber : money)),
+      new Chart("price", "#0066cc", (value, axis) => format(value, axis ? axisNumber : number)),
+      new Chart("probability", "#9a5706", (value) => percent.format(value), [0, 1])
     ];
 
     function snapshotOptions(keepSelection) {
@@ -962,6 +1133,17 @@
           .sort((a, b) => Number(b.at) - Number(a.at));
         state.historyKey = key;
         for (const chart of charts) chart.update(points);
+        if (before === null) {
+          const firstSparkline = !state.hero.points.length;
+          state.hero.points = points.filter((point) => measure(point.equity) !== null).slice(-36);
+          drawHeroSparkline();
+          if (firstSparkline && state.hero.points.length && !reduceMotion.matches) {
+            el("hero-sparkline").animate(
+              [{clipPath: "inset(0 100% 0 0)"}, {clipPath: "inset(0 0 0 0)"}],
+              {duration: 560, easing: "cubic-bezier(.22,.68,.24,1)"}
+            );
+          }
+        }
         text("probability-label", data.probability_label || (el("timeframe").selectedOptions[0].textContent + "看多概率"));
         const windowEnd = before === null ? "" : " · 截至 " + formatTime(before);
         text("history-note", "北京时间 · " + state.snapshots.length + " 个快照" + windowEnd);
@@ -984,7 +1166,7 @@
         if (request.signal.aborted) return;
         renderOverview(data);
         state.latest = data.latest_at || null;
-        await Promise.all([loadHistory(force), loadDecisions(force)]);
+        await Promise.all([loadHistory(force), loadDecisions(force), loadHeroDecision(force)]);
       } catch (error) {
         if (isSuperseded(request)) return;
         healthIndicator("bad", "连接失败");
@@ -1004,6 +1186,15 @@
       state.snapshots = [];
       state.snapshot = null;
       state.archivePin = null;
+      state.hero.request?.abort();
+      state.hero.key = null;
+      state.hero.points = [];
+      el("hero-updated").removeAttribute("datetime");
+      text("hero-updated", "—");
+      text("hero-asset", el("asset").value + " 账户概览");
+      text("hero-equity", "—");
+      renderHeroDecision(null);
+      drawHeroSparkline();
       resetDecisions();
       for (const chart of charts) chart.update([]);
       snapshotOptions(false);
@@ -1044,6 +1235,35 @@
     el("archive-at").addEventListener("change", loadSnapshot);
     el("factor-search").addEventListener("input", () => renderArchive());
     el("refresh").addEventListener("click", () => refresh(true));
+    new ResizeObserver(drawHeroSparkline).observe(el("hero-sparkline"));
+    const reveal = new IntersectionObserver((entries) => {
+      for (const entry of entries) if (entry.isIntersecting) {
+        entry.target.classList.add("has-entered");
+        reveal.unobserve(entry.target);
+      }
+    }, {threshold: .07});
+    for (const section of document.querySelectorAll(".reveal-on-scroll")) reveal.observe(section);
+    const nav = [...document.querySelectorAll(".page-nav a")];
+    const currentSection = new IntersectionObserver((entries) => {
+      const entered = entries.find((entry) => entry.isIntersecting);
+      if (!entered) return;
+      for (const link of nav) {
+        if (link.hash === "#" + entered.target.id) link.setAttribute("aria-current", "location");
+        else link.removeAttribute("aria-current");
+      }
+    }, {rootMargin: "-22% 0px -60% 0px"});
+    for (const link of nav) currentSection.observe(document.querySelector(link.hash));
+    const stage = document.querySelector(".hero-stage");
+    stage.addEventListener("pointermove", (event) => {
+      if (reduceMotion.matches || event.pointerType !== "mouse") return;
+      const frame = stage.getBoundingClientRect();
+      stage.style.setProperty("--drift-x", (event.clientX - frame.left - frame.width / 2) * .052 + "px");
+      stage.style.setProperty("--drift-y", (event.clientY - frame.top - frame.height / 2) * .043 + "px");
+    });
+    stage.addEventListener("pointerleave", () => {
+      stage.style.removeProperty("--drift-x");
+      stage.style.removeProperty("--drift-y");
+    });
     renderAccount({}, [], [], true);
     refresh();
     setInterval(refresh, 30000);
