@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Quant · CTA 因子与模拟盘</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0a1017; --card: #101923; --input: #15212e; --line: #283747;
+      --text: #e9f0f7; --muted: #aab9c9; --green: #5de4bf; --blue: #85bcff;
+      --amber: #ffd28d; --red: #ffa7ad;
+      color: var(--text); background: var(--bg);
+      font: 14px/1.5 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    h1, h2, p, figure { margin: 0; }
+    h1 { font-size: clamp(26px, 4vw, 39px); line-height: 1.2; }
+    h2 { font-size: 17px; }
+    button, select, input {
+      min-height: 40px; padding: 6px 10px; font: inherit; color: var(--text);
+      background: var(--input); border: 1px solid var(--line); border-radius: 8px;
+    }
+    button, select, summary { cursor: pointer; }
+    button:hover, select:hover { border-color: var(--muted); }
+    :focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
+    button:disabled, select:disabled, input:disabled { opacity: .65; cursor: default; }
+    [hidden] { display: none !important; }
+    .shell { max-width: 1320px; margin: auto; padding-inline: clamp(14px, 4vw, 48px); }
+    .top { border-bottom: 1px solid var(--line); }
+    .top header { display: flex; align-items: center; justify-content: space-between; min-height: 62px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 700; letter-spacing: .04em; }
+    .brand::before { content: ""; width: 12px; height: 12px; background: var(--green); border-radius: 3px; transform: rotate(45deg); }
+    .controls { display: flex; flex-wrap: wrap; align-items: end; gap: 9px; }
+    .status { padding: 4px 9px; border: 1px solid var(--line); border-radius: 20px; color: var(--muted); white-space: nowrap; margin-block: auto; }
+    .status::before { content: "●"; margin-right: 6px; }
+    .positive, .status[data-kind="good"] { color: var(--green); }
+    .negative, .status[data-kind="bad"] { color: var(--red); }
+    .status[data-kind="warn"] { color: var(--amber); }
+    main { padding-block: 28px 48px; }
+    .intro, .section-head { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .note { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .alert { margin: 0 0 12px; padding: 9px 12px; color: var(--amber); background: #262119; border: 1px solid #674f2f; border-radius: 8px; overflow-wrap: anywhere; }
+    .metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin: 0 0 14px; }
+    .metric, .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+    .metric { padding: 13px 15px; }
+    .metric dt, .metric small { color: var(--muted); }
+    .metric small.positive { color: var(--green); }
+    .metric small.negative { color: var(--red); }
+    .metric dd { font-size: clamp(18px, 2.5vw, 27px); font-weight: 650; margin: 4px 0 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .metric small { display: block; margin-top: 2px; }
+    .card { padding: 16px; margin-bottom: 14px; }
+    label { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: 12px; max-width: 100%; }
+    label select, label input { max-width: 100%; }
+    #asset { min-width: 126px; }
+    .columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+    figure + figure { border-top: 1px solid var(--line); margin-top: 11px; padding-top: 10px; }
+    figcaption { min-height: 21px; display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); }
+    .legend::before { content: ""; display: inline-block; vertical-align: 1px; width: 8px; height: 8px; border-radius: 100%; background: var(--legend); margin-right: 6px; }
+    .chart { position: relative; }
+    .chart canvas { display: block; width: 100%; height: 180px; }
+    .chart.equity canvas { height: 232px; }
+    .chart-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); pointer-events: none; }
+    .chart-tip { position: absolute; top: 5px; z-index: 1; padding: 5px 7px; background: var(--bg); border: 1px solid var(--line); border-radius: 7px; pointer-events: none; font-size: 12px; white-space: nowrap; }
+    .table-scroll { overflow: auto; max-height: 300px; scrollbar-color: var(--line) var(--card); }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    td, th { text-align: start; padding: 8px 9px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 550; position: sticky; top: 0; background: var(--card); }
+    tbody tr:last-child td { border-bottom: 0; }
+    td.empty { color: var(--muted); white-space: normal; }
+    .asset-link { color: var(--blue); background: transparent; padding: 1px 0; border: 0; border-radius: 2px; min-height: 26px; font-weight: 550; }
+    .asset-link:hover { text-decoration: underline; }
+    .payload { max-height: 440px; overflow: auto; color: var(--muted); padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+    .json-children { margin-left: 11px; padding-left: 11px; border-left: 1px solid var(--line); }
+    .json-key, .payload summary { color: var(--blue); overflow-wrap: anywhere; }
+    .json-leaf, pre { font: 13px/1.6 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .json-leaf span + span { color: var(--text); }
+    .raw { margin-top: 9px; color: var(--muted); }
+    pre { max-height: 440px; overflow: auto; }
+    @media (max-width: 960px) { .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (max-width: 830px) { .columns { grid-template-columns: minmax(0, 1fr); gap: 0; } }
+    @media (max-width: 560px) {
+      .intro, .section-head { flex-direction: column; align-items: start; gap: 8px; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .metric, .card { padding: 11px; }
+      .chart.equity canvas { height: 195px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <header class="shell">
+      <div class="brand">Quant</div>
+      <div class="controls"><span id="health" class="status" role="status">连接中</span><button id="refresh" type="button">刷新</button></div>
+    </header>
+  </div>
+  <main class="shell">
+    <header class="intro">
+      <div><h1>CTA 因子与模拟盘</h1><p id="strategy" class="note">正在读取模拟盘设置</p></div>
+      <p id="updated" class="note">最近采集 —</p>
+    </header>
+    <div id="service-alert" class="alert" role="status" hidden></div>
+    <section class="card" aria-labelledby="account-title">
+      <header class="section-head">
+        <div><h2 id="account-title">币种账户</h2><p id="history-note" class="note">时间按北京时间显示</p></div>
+        <div class="controls">
+          <label>币种<select id="asset" disabled><option value="">等待采集</option></select></label>
+          <label>时间范围<select id="hours"><option value="6">6 小时</option><option value="24" selected>24 小时</option><option value="168">7 天</option><option value="720">30 天</option></select></label>
+          <label>因子周期<select id="timeframe"><option value="5m">5 分钟</option><option value="15m">15 分钟</option><option value="30m">30 分钟</option><option value="1h">1 小时</option><option value="4h">4 小时</option><option value="1d">日线</option><option value="1w">周线</option></select></label>
+          <label>截至时间（北京时间）<input id="before" type="datetime-local"></label>
+          <button id="live" type="button" hidden>回到最新</button>
+        </div>
+      </header>
+      <dl class="metrics">
+        <div class="metric"><dt>账户净值</dt><dd id="equity">—</dd><small id="return">累计回报 —</small></div>
+        <div class="metric"><dt>已实现盈亏</dt><dd id="realized">—</dd><small>USDT</small></div>
+        <div class="metric"><dt>未实现盈亏</dt><dd id="unrealized">—</dd><small>USDT</small></div>
+        <div class="metric"><dt>平仓胜率</dt><dd id="win-rate">—</dd><small id="closed-count">已平仓 —</small></div>
+        <div class="metric"><dt>可用余额</dt><dd id="cash">—</dd><small>USDT</small></div>
+        <div class="metric"><dt>当前持仓数</dt><dd id="positions-count">—</dd><small id="selected-label">等待币种</small></div>
+      </dl>
+      <div id="history-alert" class="alert" role="status" hidden></div>
+      <figure>
+        <figcaption><span class="legend" style="--legend: var(--green)">账户净值（USDT）</span><span id="equity-readout"></span></figcaption>
+        <div class="chart equity"><canvas id="equity-chart" aria-label="账户净值曲线" role="img"></canvas><span id="equity-empty" class="chart-empty">等待净值数据</span><span class="chart-tip" hidden></span></div>
+      </figure>
+      <figure>
+        <figcaption><span class="legend" style="--legend: var(--blue)">币安价格（USDT）</span><span id="price-readout"></span></figcaption>
+        <div class="chart"><canvas id="price-chart" aria-label="币安价格曲线" role="img"></canvas><span id="price-empty" class="chart-empty">等待价格数据</span><span class="chart-tip" hidden></span></div>
+      </figure>
+      <figure>
+        <figcaption><span class="legend" style="--legend: var(--amber)" id="probability-label">看多概率</span><span id="probability-readout"></span></figcaption>
+        <div class="chart"><canvas id="probability-chart" aria-label="看多概率曲线" role="img"></canvas><span id="probability-empty" class="chart-empty">等待概率数据</span><span class="chart-tip" hidden></span></div>
+      </figure>
+    </section>
+    <div class="columns">
+      <section class="card" aria-labelledby="positions-title">
+        <header class="section-head"><h2 id="positions-title">当前持仓</h2></header>
+        <div class="table-scroll" tabindex="0" aria-label="当前持仓表"><table>
+          <thead><tr><th scope="col">方向</th><th scope="col">数量</th><th scope="col">开仓价</th><th scope="col">当前价</th><th scope="col">浮动盈亏</th><th scope="col">开仓时间</th></tr></thead><tbody id="positions"></tbody>
+        </table></div>
+      </section>
+      <section class="card" aria-labelledby="trades-title">
+        <header class="section-head"><h2 id="trades-title">最近模拟成交</h2></header>
+        <div class="table-scroll" tabindex="0" aria-label="最近模拟成交表"><table>
+          <thead><tr><th scope="col">时间</th><th scope="col">操作</th><th scope="col">价格</th><th scope="col">数量</th><th scope="col">费用</th><th scope="col">盈亏</th><th scope="col">原因</th></tr></thead><tbody id="trades"></tbody>
+        </table></div>
+      </section>
+    </div>
+    <section id="comparison" class="card" aria-labelledby="comparison-title" hidden>
+      <header class="section-head"><h2 id="comparison-title">各币种账户</h2></header>
+      <div class="table-scroll" tabindex="0" aria-label="各币种账户表"><table>
+        <thead><tr><th scope="col">币种</th><th scope="col">净值（USDT）</th><th scope="col">累计回报</th><th scope="col">平仓胜率</th><th scope="col">已平仓数</th></tr></thead><tbody id="accounts"></tbody>
+      </table></div>
+    </section>
+    <section class="card" aria-labelledby="archive-title">
+      <header class="section-head">
+        <div><h2 id="archive-title">因子快照回溯</h2><p id="archive-note" class="note">按上方币种筛选</p></div>
+        <div class="controls">
+          <label>快照时间<select id="archive-at" disabled><option value="">等待采集</option></select></label>
+          <label>字段筛选<input id="factor-search" type="search" placeholder="周期、字段名或值" disabled></label>
+        </div>
+      </header>
+      <div id="archive-alert" class="alert" role="status" hidden></div>
+      <div id="archive" class="payload">等待采集数据</div>
+      <details id="raw" class="raw" hidden><summary>原始 JSON</summary><pre id="raw-json"></pre></details>
+    </section>
+  </main>
+  <script>
+    "use strict";
+    const el = (id) => document.getElementById(id);
+    const text = (id, value) => { el(id).textContent = value; };
+    const number = new Intl.NumberFormat("zh-CN", { maximumSignificantDigits: 9 });
+    const axisNumber = new Intl.NumberFormat("zh-CN", { maximumSignificantDigits: 6 });
+    const money = new Intl.NumberFormat("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const percent = new Intl.NumberFormat("zh-CN", { style: "percent", maximumFractionDigits: 2 });
+    const date = new Intl.DateTimeFormat("zh-CN", {
+      timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"
+    });
+    const axisDate = new Intl.DateTimeFormat("zh-CN", {
+      timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+    });
+    const state = {
+      latest: null, snapshots: [], snapshot: null, options: null, overview: null,
+      history: null, archive: null, historyKey: null, timeframeSet: false
+    };
+
+    function measure(value) {
+      if (value === undefined || value === null || value === "") return null;
+      const result = Number(value);
+      return Number.isFinite(result) ? result : null;
+    }
+
+    function format(value, formatter = number) {
+      return measure(value) === null ? "—" : formatter.format(value);
+    }
+
+    function formatTime(value, formatter = date) {
+      const result = measure(value);
+      return result > 0 ? formatter.format(new Date(result * 1000)) : "—";
+    }
+
+    function signed(value) {
+      return (measure(value) > 0 ? "+" : "") + format(value, money);
+    }
+
+    function pnlClass(value) {
+      const amount = measure(value);
+      return amount > 0 ? "positive" : amount < 0 ? "negative" : "";
+    }
+
+    function percentagePoints(value) {
+      const result = measure(value);
+      return result === null ? "—" : (result > 0 ? "+" : "") + percent.format(result / 100);
+    }
+
+    function alertText(id, value) {
+      text(id, value);
+      el(id).hidden = !value;
+    }
+
+    function healthIndicator(kind, value) {
+      el("health").dataset.kind = kind;
+      text("health", value);
+    }
+
+    async function get(path, query, controller) {
+      const url = new URL("/api/" + path, window.location.origin);
+      for (const [key, value] of Object.entries(query)) {
+        if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, value);
+      }
+      const timeout = setTimeout(() => controller.abort("timeout"), 15000);
+      try {
+        const response = await fetch(url, { cache: "no-store", signal: controller.signal });
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        return await response.json();
+      } catch (error) {
+        if (controller.signal.reason === "timeout") throw new Error("请求超时");
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    function isSuperseded(request) {
+      return request.signal.aborted && request.signal.reason !== "timeout";
+    }
+
+    function table(id, columns, rows, emptyMessage) {
+      const fragment = document.createDocumentFragment();
+      for (const row of rows) {
+        const tr = document.createElement("tr");
+        for (const value of row) {
+          const td = document.createElement("td");
+          if (value instanceof Node) td.append(value);
+          else if (Array.isArray(value)) {
+            td.textContent = value[0];
+            td.className = value[1];
+          } else td.textContent = value ?? "—";
+          tr.append(td);
+        }
+        fragment.append(tr);
+      }
+      if (!rows.length) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.className = "empty";
+        td.colSpan = columns;
+        td.textContent = emptyMessage;
+        tr.append(td);
+        fragment.append(tr);
+      }
+      el(id).replaceChildren(fragment);
+    }
+
+    function list(value) {
+      return Array.isArray(value) ? value : [];
+    }
+
+    function direction(value) {
+      return value === "long" ? "多" : value === "short" ? "空" : "—";
+    }
+
+    function renderAccount(account = {}, positions = [], trades = [], waiting = false) {
+      text("equity", format(account.equity, money));
+      text("return", "累计回报 " + percentagePoints(account.return_pct));
+      el("return").className = pnlClass(account.return_pct);
+      for (const id of ["realized", "unrealized"]) {
+        text(id, signed(account[id]));
+        el(id).className = pnlClass(account[id]);
+      }
+      text("win-rate", format(account.win_rate, percent));
+      text("closed-count", "已平仓 " + format(account.closed_trades) + " 笔");
+      text("cash", format(account.cash, money));
+      text("positions-count", format(account.open_positions ?? (waiting ? null : positions.length)));
+      table("positions", 6, positions.map((item) => [
+        direction(item.direction), format(item.qty), format(item.entry_price), format(item.mark_price),
+        [signed(item.unrealized), pnlClass(item.unrealized)], formatTime(item.opened_at)
+      ]), waiting ? "等待账户数据" : "暂无模拟持仓");
+      const actions = { open: "开", close: "平", liquidate: "强平" };
+      table("trades", 7, [...trades].sort((a, b) => Number(b.at) - Number(a.at)).map((item) => [
+        formatTime(item.at), (actions[item.action] || item.action || "") + direction(item.direction),
+        format(item.price), format(item.qty), format(item.fee),
+        [signed(item.pnl), pnlClass(item.pnl)], item.reason || "—"
+      ]), waiting ? "等待账户数据" : "暂无模拟成交");
+    }
+
+    function renderComparison(assets) {
+      const comparable = assets.filter((item) => [item.equity, item.return_pct, item.win_rate, item.closed_trades]
+        .some((value) => measure(value) !== null));
+      el("comparison").hidden = !comparable.length;
+      if (!comparable.length) return;
+      table("accounts", 5, comparable.map((item) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "asset-link";
+        button.textContent = item.label || item.title || item.symbol || item.id;
+        button.addEventListener("click", () => {
+          if (el("asset").value === String(item.id)) return;
+          el("asset").value = item.id;
+          changeAsset();
+          el("asset").focus();
+        });
+        return [
+          button, format(item.equity, money), [percentagePoints(item.return_pct), pnlClass(item.return_pct)],
+          format(item.win_rate, percent), format(item.closed_trades)
+        ];
+      }), "暂无账户数据");
+    }
+
+    function renderAssets(assets, selected) {
+      const field = el("asset");
+      const current = field.value;
+      const pairs = assets.map((item) => [String(item.id), item.label || item.title || item.symbol || item.id]);
+      const options = JSON.stringify(pairs);
+      if (options !== state.options) {
+        const fragment = document.createDocumentFragment();
+        for (const [id, label] of pairs) fragment.append(new Option(label, id));
+        if (!pairs.length) fragment.append(new Option("等待采集", ""));
+        field.replaceChildren(fragment);
+        state.options = options;
+      }
+      const preferred = selected || current;
+      if (pairs.some(([id]) => id === String(preferred))) field.value = preferred;
+      else {
+        const bitcoin = pairs.find(([id]) => /^BTC(?:USDT)?$/i.test(id));
+        field.value = bitcoin ? bitcoin[0] : pairs[0]?.[0] || "";
+      }
+      field.disabled = !pairs.length;
+      text("selected-label", field.value ? field.selectedOptions[0].textContent : "等待币种");
+      renderComparison(assets);
+    }
+
+    function renderOverview(data) {
+      const health = data.health || {};
+      const status = String(health.status || "").toLowerCase();
+      if (["failed", "failure", "error", "offline"].includes(status)) healthIndicator("bad", "采集异常");
+      else if (["delayed", "stale", "partial", "degraded", "warning"].includes(status)) healthIndicator("warn", "采集延迟或不完整");
+      else if (data.latest_at && ["ok", "normal", "healthy", ""].includes(status)) healthIndicator("good", "采集正常");
+      else healthIndicator("", "等待采集");
+      const statusParts = [health.message];
+      if (measure(health.count) !== null && measure(health.expected) !== null && Number(health.count) < Number(health.expected)) {
+        statusParts.push("本轮覆盖 " + health.count + " / " + health.expected + " 个币种");
+      }
+      alertText("service-alert", statusParts.filter(Boolean).join(" · "));
+
+      const strategy = data.strategy || {};
+      const settings = [];
+      if (measure(strategy.balance) !== null) settings.push("每币初始本金 " + format(strategy.balance) + " USDT");
+      if (measure(strategy.leverage) !== null) settings.push(format(strategy.leverage) + "× 杠杆");
+      if (strategy.description) settings.push(strategy.description);
+      else if (strategy.enabled === false) settings.push("仅采集，等待开平仓规则");
+      if (!state.timeframeSet && Array.from(el("timeframe").options).some((option) => option.value === strategy.period)) {
+        el("timeframe").value = strategy.period;
+        state.timeframeSet = true;
+      }
+      text("strategy", settings.join(" · ") || "模拟盘");
+      text("updated", "最近采集 " + formatTime(data.latest_at));
+      el("updated").title = "来源时间 " + formatTime(data.source_at);
+      renderAssets(list(data.assets), data.selected || data.asset);
+      renderAccount(data.account || {}, list(data.positions), list(data.trades), !el("asset").value);
+    }
+
+    class Chart {
+      constructor(name, color, formatter, limits = null) {
+        this.name = name;
+        this.color = color;
+        this.formatter = formatter;
+        this.limits = limits;
+        this.canvas = el(name + "-chart");
+        this.tip = this.canvas.parentElement.querySelector(".chart-tip");
+        this.points = [];
+        this.frame = null;
+        this.hover = null;
+        new ResizeObserver(() => this.draw()).observe(this.canvas);
+        this.canvas.addEventListener("pointermove", (event) => this.setHover(event));
+        this.canvas.addEventListener("pointerleave", () => { this.hover = null; this.draw(); });
+      }
+
+      update(points) {
+        this.points = points;
+        this.hover = null;
+        const latest = points.findLast((item) => measure(item[this.name]) !== null);
+        el(this.name + "-empty").hidden = Boolean(latest);
+        text(this.name + "-readout", latest ? this.formatter(Number(latest[this.name])) : "");
+        this.draw();
+      }
+
+      setHover(event) {
+        if (!this.frame) return;
+        const { first, span, left, width } = this.frame;
+        const offset = event.clientX - this.canvas.getBoundingClientRect().left;
+        const time = first + span * (offset - left) / width;
+        let lower = 0;
+        let upper = this.points.length - 1;
+        while (lower < upper) {
+          const mid = Math.floor((lower + upper) / 2);
+          if (this.points[mid].at < time) lower = mid + 1;
+          else upper = mid;
+        }
+        const next = this.points[lower];
+        const prior = this.points[lower - 1];
+        const nearest = prior && Math.abs(prior.at - time) < Math.abs(next.at - time) ? prior : next;
+        if (this.hover === nearest) return;
+        this.hover = nearest;
+        this.draw();
+      }
+
+      draw() {
+        const width = this.canvas.clientWidth;
+        const height = this.canvas.clientHeight;
+        this.tip.hidden = true;
+        this.frame = null;
+        if (!width || !height) return;
+        const ratio = Math.min(2, window.devicePixelRatio || 1);
+        if (this.canvas.width !== Math.round(width * ratio)) this.canvas.width = Math.round(width * ratio);
+        if (this.canvas.height !== Math.round(height * ratio)) this.canvas.height = Math.round(height * ratio);
+        const ctx = this.canvas.getContext("2d");
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+        const values = this.points.map((item) => measure(item[this.name])).filter((value) => value !== null);
+        if (!values.length) return;
+        let min = Math.min(...values);
+        let max = Math.max(...values);
+        if (this.limits) [min, max] = this.limits;
+        else {
+          const padding = (max - min) * .08 || Math.abs(max) * .002 || .01;
+          min -= padding;
+          max += padding;
+        }
+        const ticks = width < 470 ? 2 : 4;
+        const labels = Array.from({ length: ticks + 1 }, (_, i) => this.formatter(max - (max - min) * i / ticks, true));
+        ctx.font = "11px system-ui";
+        const left = Math.ceil(Math.max(...labels.map((label) => ctx.measureText(label).width))) + 10;
+        const plotWidth = Math.max(1, width - left - 12);
+        const plotHeight = Math.max(1, height - 47);
+        const top = 17;
+        const first = this.points[0].at;
+        const span = Math.max(1, this.points[this.points.length - 1].at - first);
+        const x = (at) => left + (at - first) / span * plotWidth;
+        const y = (value) => top + (max - value) / (max - min) * plotHeight;
+        this.frame = { first, span, left, width: plotWidth };
+        ctx.setLineDash([]);
+        ctx.lineWidth = 1;
+        ctx.textBaseline = "middle";
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#aab9c9";
+        ctx.strokeStyle = "#283747";
+        labels.forEach((label, i) => {
+          const tickY = top + i / ticks * plotHeight;
+          ctx.beginPath();
+          ctx.moveTo(left, tickY);
+          ctx.lineTo(left + plotWidth, tickY);
+          ctx.stroke();
+          ctx.fillText(label, left - 6, tickY);
+        });
+        for (let i = 0; i <= (span === 1 ? 0 : ticks); i += 1) {
+          const at = first + span * i / ticks;
+          ctx.textAlign = i === 0 ? "left" : i === ticks ? "right" : "center";
+          ctx.fillText(formatTime(at, axisDate), x(at), height - 13);
+        }
+        ctx.strokeStyle = this.color;
+        ctx.fillStyle = this.color;
+        ctx.lineWidth = 1.8;
+        const isolated = [];
+        let previous = null;
+        let connected = false;
+        ctx.beginPath();
+        this.points.forEach((point, index) => {
+          const value = measure(point[this.name]);
+          if (value === null) {
+            if (previous && !connected) isolated.push(previous);
+            previous = null;
+            connected = false;
+            return;
+          }
+          if (previous && point.at - previous.at <= 450) {
+            ctx.lineTo(x(point.at), y(value));
+            connected = true;
+          } else {
+            if (previous && !connected) isolated.push(previous);
+            ctx.moveTo(x(point.at), y(value));
+            connected = false;
+          }
+          previous = { at: point.at, value };
+          if (index === this.points.length - 1 && !connected) isolated.push(previous);
+        });
+        ctx.stroke();
+        for (const point of isolated) {
+          ctx.beginPath();
+          ctx.arc(x(point.at), y(point.value), 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        if (!this.hover) return;
+        const hoverX = x(this.hover.at);
+        const value = measure(this.hover[this.name]);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "#7f91a7";
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(hoverX, top);
+        ctx.lineTo(hoverX, top + plotHeight);
+        ctx.stroke();
+        if (value !== null) {
+          ctx.beginPath();
+          ctx.arc(hoverX, y(value), 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        this.tip.textContent = formatTime(this.hover.at, axisDate) + " · " + (value === null ? "数据缺失" : this.formatter(value));
+        this.tip.hidden = false;
+        this.tip.style.left = Math.max(0, Math.min(hoverX + 8, width - this.tip.offsetWidth)) + "px";
+      }
+    }
+
+    const charts = [
+      new Chart("equity", "#5de4bf", (value, axis) => format(value, axis ? axisNumber : money)),
+      new Chart("price", "#85bcff", (value, axis) => format(value, axis ? axisNumber : number)),
+      new Chart("probability", "#ffd28d", (value) => percent.format(value), [0, 1])
+    ];
+
+    function snapshotOptions(keepSelection) {
+      const field = el("archive-at");
+      const old = keepSelection ? field.value : "";
+      const fragment = document.createDocumentFragment();
+      if (state.snapshots.length) {
+        fragment.append(new Option("最新 · " + formatTime(state.snapshots[0].at), "latest"));
+        for (const snapshot of state.snapshots) fragment.append(new Option(formatTime(snapshot.at), snapshot.at));
+      } else fragment.append(new Option("当前时段没有快照", ""));
+      field.replaceChildren(fragment);
+      field.disabled = !state.snapshots.length;
+      if (state.snapshots.some((snapshot) => String(snapshot.at) === old)) field.value = old;
+    }
+
+    function jsonTree(value, query, key = "", depth = 0, ancestorMatch = false) {
+      const label = key || "全部字段";
+      const hit = ancestorMatch || key.toLowerCase().includes(query);
+      if (value === null || typeof value !== "object") {
+        const contents = typeof value === "string" ? value : JSON.stringify(value);
+        if (!hit && !String(contents).toLowerCase().includes(query)) return null;
+        const row = document.createElement("div");
+        row.className = "json-leaf";
+        const title = document.createElement("span");
+        title.className = "json-key";
+        title.textContent = label + "  ";
+        const body = document.createElement("span");
+        body.textContent = contents;
+        row.append(title, body);
+        return row;
+      }
+      const entries = Object.entries(value);
+      const nested = document.createElement("div");
+      nested.className = "json-children";
+      for (const [childKey, child] of entries) {
+        const node = jsonTree(child, query, childKey, depth + 1, hit);
+        if (node) nested.append(node);
+      }
+      if (!nested.childNodes.length && (!hit || entries.length)) return null;
+      if (!nested.childNodes.length) nested.textContent = Array.isArray(value) ? "[]" : "{}";
+      const details = document.createElement("details");
+      details.open = Boolean(query) || depth < 2;
+      const summary = document.createElement("summary");
+      summary.textContent = label + " · " + entries.length;
+      details.append(summary, nested);
+      return details;
+    }
+
+    function renderArchive(message) {
+      const value = state.snapshot?.data;
+      const filter = el("factor-search");
+      if (value === undefined || value === null) {
+        text("archive", message || "当前时段没有此币种的因子快照");
+        text("archive-note", "按上方币种筛选");
+        filter.disabled = true;
+        el("raw").hidden = true;
+        return;
+      }
+      const tree = jsonTree(value, filter.value.trim().toLowerCase());
+      el("archive").replaceChildren(tree || "没有匹配的字段");
+      const parts = [state.snapshot.asset, "采集 " + formatTime(state.snapshot.at)];
+      if (state.snapshot.source_at) parts.push("来源 " + formatTime(state.snapshot.source_at));
+      text("archive-note", parts.filter(Boolean).join(" · "));
+      if (el("raw-json").textContent !== state.snapshot.raw) text("raw-json", state.snapshot.raw);
+      filter.disabled = false;
+      el("raw").hidden = false;
+    }
+
+    async function loadSnapshot() {
+      state.archive?.abort();
+      const request = new AbortController();
+      state.archive = request;
+      const asset = el("asset").value;
+      const selection = el("archive-at").value;
+      const at = selection === "latest" ? String(state.snapshots[0]?.at || "") : selection;
+      alertText("archive-alert", "");
+      if (!asset || !at) {
+        state.snapshot = null;
+        renderArchive();
+        return;
+      }
+      if (state.snapshot && String(state.snapshot.at) === at && String(state.snapshot.asset) === asset) return;
+      state.snapshot = null;
+      renderArchive("正在读取快照");
+      try {
+        const data = await get("snapshot", { asset, at }, request);
+        if (request.signal.aborted) return;
+        state.snapshot = { ...data, asset: data.asset || asset, raw: JSON.stringify(data.data ?? null, null, 2) };
+        renderArchive();
+      } catch (error) {
+        if (isSuperseded(request)) return;
+        renderArchive();
+        alertText("archive-alert", "读取快照失败 · " + error.message);
+      }
+    }
+
+    async function loadHistory(force = false) {
+      const asset = el("asset").value;
+      const hours = el("hours").value;
+      const timeframe = el("timeframe").value;
+      const cutoff = el("before").value;
+      const before = cutoff ? Date.parse(cutoff + "+08:00") / 1000 : null;
+      if (before !== null && !Number.isFinite(before)) {
+        alertText("history-alert", "请输入有效的北京时间");
+        return;
+      }
+      el("live").hidden = !cutoff;
+      const key = JSON.stringify([asset, hours, timeframe, before, before === null ? state.latest : null]);
+      if (!force && state.historyKey === key) return;
+      state.history?.abort();
+      const request = new AbortController();
+      state.history = request;
+      try {
+        const data = await get("history", { asset, hours, timeframe, before }, request);
+        if (request.signal.aborted) return;
+        const points = list(data.points).filter((row) => measure(row.at) !== null)
+          .map((row) => ({ ...row, at: Number(row.at) })).sort((a, b) => a.at - b.at);
+        state.snapshots = list(data.snapshots).filter((row) => measure(row.at) !== null)
+          .sort((a, b) => Number(b.at) - Number(a.at));
+        state.historyKey = key;
+        for (const chart of charts) chart.update(points);
+        text("probability-label", data.probability_label || (el("timeframe").selectedOptions[0].textContent + "看多概率"));
+        const windowEnd = before === null ? "" : " · 截至 " + formatTime(before);
+        text("history-note", "北京时间 · " + state.snapshots.length + " 个快照" + windowEnd);
+        alertText("history-alert", "");
+        snapshotOptions(true);
+        await loadSnapshot();
+      } catch (error) {
+        if (!isSuperseded(request)) alertText("history-alert", "读取历史失败 · " + error.message);
+      }
+    }
+
+    async function refresh(force = false) {
+      if (state.overview && !force) return;
+      state.overview?.abort();
+      const request = new AbortController();
+      state.overview = request;
+      el("refresh").disabled = true;
+      try {
+        const data = await get("overview", { asset: el("asset").value }, request);
+        if (request.signal.aborted) return;
+        renderOverview(data);
+        state.latest = data.latest_at || null;
+        await loadHistory(force);
+      } catch (error) {
+        if (isSuperseded(request)) return;
+        healthIndicator("bad", "连接失败");
+        alertText("service-alert", "读取面板失败 · " + error.message);
+      } finally {
+        if (state.overview === request) {
+          state.overview = null;
+          el("refresh").disabled = false;
+        }
+      }
+    }
+
+    function changeAsset() {
+      state.history?.abort();
+      state.archive?.abort();
+      state.historyKey = null;
+      state.snapshots = [];
+      state.snapshot = null;
+      for (const chart of charts) chart.update([]);
+      snapshotOptions(false);
+      renderArchive("正在读取所选币种");
+      renderAccount({}, [], [], true);
+      text("selected-label", el("asset").selectedOptions[0]?.textContent || "等待币种");
+      text("history-note", "正在读取所选币种");
+      alertText("history-alert", "");
+      alertText("archive-alert", "");
+      refresh(true);
+    }
+
+    el("asset").addEventListener("change", changeAsset);
+    el("hours").addEventListener("change", () => loadHistory());
+    el("timeframe").addEventListener("change", () => {
+      state.timeframeSet = true;
+      loadHistory();
+    });
+    el("before").addEventListener("change", () => loadHistory());
+    el("live").addEventListener("click", () => {
+      el("before").value = "";
+      loadHistory();
+    });
+    el("archive-at").addEventListener("change", loadSnapshot);
+    el("factor-search").addEventListener("input", () => renderArchive());
+    el("refresh").addEventListener("click", () => refresh(true));
+    renderAccount({}, [], [], true);
+    refresh();
+    setInterval(refresh, 30000);
+  </script>
+</body>
+</html>
